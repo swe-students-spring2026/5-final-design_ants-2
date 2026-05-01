@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: cicd
     env:
-      PORT: ${{ github.ref_name == 'prod' && '80' || '3000' }}
+      PORT: ${{ github.ref_name == 'prod' && '8080' || '3000' }}
       TAG: ${{ github.ref_name }}
       DEPLOY_DIR: ${{ github.ref_name == 'prod' && '/opt/se/prod' || '/opt/se/dev' }}
     steps:
