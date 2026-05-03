@@ -3,13 +3,14 @@ FROM python:3.11-slim AS base
 WORKDIR /app
 
 # Install dependencies in a separate layer so source changes don't bust the cache.
-COPY requirements.txt .
+COPY recommendation-service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application source.
-COPY app ./app
-COPY wsgi.py .
-COPY scripts ./scripts
+COPY db ./db
+COPY recommendation-service/app ./app
+COPY recommendation-service/wsgi.py .
+COPY recommendation-service/scripts ./scripts
 
 ENV PORT=8000
 EXPOSE ${PORT}

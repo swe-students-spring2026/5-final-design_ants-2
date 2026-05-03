@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, render_template
 from datetime import datetime
-from db import checkins_collection, rooms_collection
+from db.db import checkins as checkins_collection, rooms as rooms_collection
 
 bp = Blueprint("main", __name__)
 
