@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: checkin-mongo
+    ports:
+      - "27017:27017"
+
+  checkin-service:
+    build: .
+    container_name: checkin-service
+    ports:
+      - "5001:5001"
+    environment:
+      MONGO_URI: mongodb://mongodb:27017/
+      DB_NAME: nyu_library_app
+      PORT: 5001
+    depends_on:
+      - mongodb
