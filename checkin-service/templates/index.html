@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NYU Library Check-in</title>
+</head>
+<body>
+  <h1>NYU Library Check-in</h1>
+
+  <h2>Create Check-in</h2>
+  <form id="checkinForm">
+    <label for="user_id">User ID:</label>
+    <input type="text" id="user_id" required />
+    <br /><br />
+
+    <label for="room_id">Room:</label>
+    <select id="room_id" required></select>
+    <br /><br />
+
+    <label for="crowdedness">Crowdedness (1-5):</label>
+    <input type="number" id="crowdedness" min="1" max="5" required />
+    <br /><br />
+
+    <label for="quietness">Quietness (1-5):</label>
+    <input type="number" id="quietness" min="1" max="5" required />
+    <br /><br />
+
+    <button type="submit">Submit Check-in</button>
+  </form>
+
+  <h3>Submit Result</h3>
+  <pre id="submitResult"></pre>
+
+  <hr />
+
+  <h2>View My Check-in History</h2>
+  <label for="history_user_id">User ID:</label>
+  <input type="text" id="history_user_id" placeholder="Enter user id" />
+  <button type="button" onclick="loadHistory()">Load History</button>
+
+  <h3>History Result</h3>
+  <pre id="historyResult"></pre>
+
+  <script>
+    async function loadRooms() {
+      try {
+        const res = await fetch("/api/rooms");
+        const rooms = await res.json();
+        const select = document.getElementById("room_id");
+
+        select.innerHTML = "";
+
+        rooms.forEach((room) => {
+          const option = document.createElement("option");
+          option.value = room._id;
+          option.textContent = room.name;
+          select.appendChild(option);
+        });
+      } catch (error) {
+        document.getElementById("submitResult").textContent =
+          "Failed to load rooms: " + error;
+      }
+    }
+
+    document.getElementById("checkinForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const payload = {
+        user_id: document.getElementById("user_id").value.trim(),
+        room_id: document.getElementById("room_id").value,
+        crowdedness: parseInt(document.getElementById("crowdedness").value, 10),
+        quietness: parseInt(document.getElementById("quietness").value, 10)
+      };
+
+      try {
+        const res = await fetch("/api/checkins", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        document.getElementById("submitResult").textContent =
+          JSON.stringify(data, null, 2);
+      } catch (error) {
+        document.getElementById("submitResult").textContent =
+          "Failed to submit check-in: " + error;
+      }
+    });
+
+    async function loadHistory() {
+      const userId = document.getElementById("history_user_id").value.trim();
+
+      if (!userId) {
+        document.getElementById("historyResult").textContent =
+          "Please enter a user id.";
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/checkins/${userId}`);
+        const data = await res.json();
+        document.getElementById("historyResult").textContent =
+          JSON.stringify(data, null, 2);
+      } catch (error) {
+        document.getElementById("historyResult").textContent =
+          "Failed to load history: " + error;
+      }
+    }
+
+    loadRooms();
+  </script>
+</body>
+</html>
