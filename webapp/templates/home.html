@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section>
+    <p><a href="{{ url_for('checkin') }}">[icon: route] Check In Now</a> &nbsp;&nbsp; <a href="{{ url_for('profile') }}">[icon: user] Profile / Sign In</a></p>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>1. Current Room Status (from checkin-service)</h2>
+    {% if rooms %}
+      <table border="1">
+        <tr>
+          <th>Room ID</th>
+          <th>Name</th>
+          <th>Crowdedness</th>
+          <th>Quietness</th>
+        </tr>
+        {% for room in rooms %}
+          <tr>
+            <td>{{ room._id }}</td>
+            <td>{{ room.name }}</td>
+            <td>{{ room.current_crowd if room.current_crowd is not none else "n/a" }}</td>
+            <td>{{ room.current_quiet if room.current_quiet is not none else "n/a" }}</td>
+          </tr>
+        {% endfor %}
+      </table>
+    {% else %}
+      <p>No room data available.</p>
+    {% endif %}
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>2. Recommended Rooms (from recommendation-service)</h2>
+    {% if recommendations %}
+      <table border="1">
+        <tr>
+          <th>Room Name</th>
+          <th>Study Score</th>
+          <th>Crowd</th>
+          <th>Quiet</th>
+          <th>Source</th>
+        </tr>
+        {% for rec in recommendations %}
+          <tr>
+            <td>{{ rec.name if rec.name is defined else rec.room_id }}</td>
+            <td>{{ rec.study_score if rec.study_score is defined else rec.score }}</td>
+            <td>{{ rec.crowd if rec.crowd is defined else "n/a" }}</td>
+            <td>{{ rec.quiet if rec.quiet is defined else "n/a" }}</td>
+            <td>{{ rec.source if rec.source is defined else "recommendation-service" }}</td>
+          </tr>
+        {% endfor %}
+      </table>
+    {% else %}
+      <p>No recommendations available.</p>
+    {% endif %}
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>3. Quick Check-In (Simple Form)</h2>
+    <p>Or use the <a href="{{ url_for('checkin') }}">guided wizard</a> instead.</p>
+    <form action="{{ url_for('checkin_step1') }}" method="get">
+      <button type="submit">Open Wizard [icon: wand]</button>
+    </form>
+  </section>
+{% endblock %}

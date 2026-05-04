@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section>
+    <p>Step 2 of 5</p>
+    <h2>Phase 1: Micro-Commitment</h2>
+    <h3>How crowded is it right now?</h3>
+    <p>[icon: tap] Tap once to auto-advance.</p>
+
+    <form method="post" action="{{ url_for('checkin_step2') }}">
+      <button type="submit" name="crowdedness" value="1">1 - Very Empty</button>
+      <button type="submit" name="crowdedness" value="2">2 - Light</button>
+      <button type="submit" name="crowdedness" value="3">3 - Medium</button>
+      <button type="submit" name="crowdedness" value="4">4 - Busy</button>
+      <button type="submit" name="crowdedness" value="5">5 - Packed</button>
+    </form>
+  </section>
+{% endblock %}

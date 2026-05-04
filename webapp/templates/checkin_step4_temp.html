@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section>
+    <p>Step 4 of 5</p>
+    <h2>Phase 3: Optional Upsell</h2>
+    <h3>How is the temperature?</h3>
+    <p>[icon: tap] Tap once to auto-advance.</p>
+
+    <form method="post" action="{{ url_for('checkin_step4_optional_temperature') }}">
+      <button type="submit" name="temperature" value="cold">Cold</button>
+      <button type="submit" name="temperature" value="comfortable">Comfortable</button>
+      <button type="submit" name="temperature" value="warm">Warm</button>
+    </form>
+
+    <form method="post" action="{{ url_for('checkin_step4_optional_temperature') }}">
+      <input type="hidden" name="skip" value="1">
+      <button type="submit">Skip</button>
+    </form>
+  </section>
+{% endblock %}
