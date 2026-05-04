@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lockin Wireframe</title>
+</head>
+<body>
+  <header>
+    <h1>Lockin</h1>
+    <p>[icon: app] UX Wireframe Mode (No Custom CSS)</p>
+    <nav>
+      <a href="{{ url_for('home') }}">Home</a> |
+      <a href="{{ url_for('checkin') }}">Check In</a> |
+      <a href="{{ url_for('profile') }}">Dashboard</a>
+    </nav>
+    <hr>
+  </header>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <section>
+        <h2>System Messages</h2>
+        <ul>
+          {% for message in messages %}
+            <li>{{ message }}</li>
+          {% endfor %}
+        </ul>
+        <hr>
+      </section>
+    {% endif %}
+  {% endwith %}
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block content %}
+  {% if not user_id %}
+  <section>
+    <h2>[icon: key] Sign In</h2>
+    <p>Sign in once per browser session to check in and track your streak.</p>
+    {% for uid in sample_user_ids %}
+      <form method="post" action="{{ url_for('session_login') }}" style="display:inline">
+        <input type="hidden" name="user_id" value="{{ uid }}">
+        <button type="submit">Sign in as {{ uid }}</button>
+      </form>
+    {% endfor %}
+  </section>
+  {% else %}
+  <section>
+    <h2>Personal Dashboard</h2>
+    <p>[icon: user] Signed in as: <strong>{{ user_id }}</strong></p>
+    <p>[icon: streak] Session streak: <strong>{{ session_streak }}</strong></p>
+    <p>[icon: retention] Task complete to dashboard transition done.</p>
+    <p>TODO: Persist streak server-side instead of browser session memory.</p>
+  </section>
+
+  <hr>
+
+  <section>
+    <h3>Optional Feedback (Wireframe Capture)</h3>
+    {% if optional_feedback %}
+      <ul>
+        {% for key, value in optional_feedback.items() %}
+          <li>{{ key }}: {{ value }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>No optional feedback captured yet.</p>
+    {% endif %}
+    <p>TODO: Store optional feedback in backend when schema is available.</p>
+  </section>
+
+  <hr>
+
+  <section>
+    <h3>My Recent Check-ins</h3>
+    {% if checkins %}
+      <ul>
+        {% for item in checkins[:10] %}
+          <li>
+            {{ item.time if item.time else "time-unavailable" }}
+            - room {{ item.room_id }}
+            - crowd {{ item.crowdedness }}
+            - quiet {{ item.quietness }}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>No check-ins yet.</p>
+    {% endif %}
+  </section>
+
+  <hr>
+
+  <section>
+    <h3>Recommended Rooms</h3>
+    {% if recommendations %}
+      <ol>
+        {% for rec in recommendations %}
+          <li>
+            {{ rec.room_name if rec.room_name else rec.room_id }}
+            - score {{ rec.score if rec.score is not none else "n/a" }}
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <p>No recommendations available right now.</p>
+    {% endif %}
+  </section>
+
+  <hr>
+
+  <section>
+    <a href="{{ url_for('checkin') }}">Log Another Session</a>
+  </section>
+  {% endif %}
+{% endblock %}

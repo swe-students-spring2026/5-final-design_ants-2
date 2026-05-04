@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section>
+    <p>Step 5 of 5</p>
+    <h2>Phase 3: Optional Upsell</h2>
+    <h3>How available are outlets?</h3>
+    <p>[icon: tap] Tap once to finish.</p>
+
+    <form method="post" action="{{ url_for('checkin_step5_optional_outlets') }}">
+      <button type="submit" name="outlets" value="none">None</button>
+      <button type="submit" name="outlets" value="few">A Few</button>
+      <button type="submit" name="outlets" value="many">Many</button>
+    </form>
+
+    <form method="post" action="{{ url_for('checkin_step5_optional_outlets') }}">
+      <input type="hidden" name="skip" value="1">
+      <button type="submit">Skip</button>
+    </form>
+  </section>
+{% endblock %}

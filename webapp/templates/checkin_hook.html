@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section>
+    <p>Phase 2: Emotional Hook</p>
+    <h2>[icon: success] Check-in logged</h2>
+    <p>You just helped <strong>{{ impact_number }}</strong> students.</p>
+    <p>Location: {{ checkin_data.room_id }} | Crowd: {{ checkin_data.crowdedness }} | Quiet: {{ checkin_data.quietness }}</p>
+
+    <form method="get" action="{{ url_for('checkin_step4_optional_temperature') }}">
+      <button type="submit">Answer Two More Quick Questions</button>
+    </form>
+
+    <form method="get" action="{{ url_for('profile') }}">
+      <button type="submit">Skip And Finish</button>
+    </form>
+  </section>
+{% endblock %}

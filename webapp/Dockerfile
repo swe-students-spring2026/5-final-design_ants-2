@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
+RUN pip install flask requests
+COPY webapp/app.py .
+COPY webapp/templates/ templates/
 CMD ["python", "app.py"]

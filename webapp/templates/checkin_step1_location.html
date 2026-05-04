@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section>
+    <p>Step 1 of 5</p>
+    <h2>Phase 1: Micro-Commitment</h2>
+    <h3>Choose Location</h3>
+    <p>[icon: location] One tap to choose where you are studying.</p>
+    {% if smart_default_room %}
+      <p>[icon: spark] Smart default: {{ smart_default_room }} from your last check-in.</p>
+    {% endif %}
+
+    {% if rooms %}
+      {% for room in rooms %}
+        <form method="post" action="{{ url_for('checkin_step1') }}">
+          <input type="hidden" name="room_id" value="{{ room._id }}">
+          <button type="submit">
+            {{ room.name }}
+            {% if room._id == smart_default_room %}
+              (Recommended)
+            {% endif %}
+          </button>
+        </form>
+      {% endfor %}
+    {% else %}
+      <p>Room list unavailable.</p>
+      <a href="{{ url_for('home') }}">Back Home</a>
+    {% endif %}
+  </section>
+{% endblock %}
