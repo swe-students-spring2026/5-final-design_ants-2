@@ -1,6 +1,6 @@
 import pytest
 from app import create_app
-from db import checkins_collection, rooms_collection
+from db.db import checkins as checkins_collection, rooms as rooms_collection
 
 
 @pytest.fixture

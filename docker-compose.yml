@@ -12,8 +12,11 @@ services:
     restart: unless-stopped
 
   checkin-service:
-    build: ./checkin-service
+    build:
+      context: .
+      dockerfile: checkin-service/Dockerfile
     image: incrediblez7/5-final-design_ants-checkin:${TAG:-latest}
+    env_file: ./checkin-service/.env
     ports:
       - "${CHECKIN_PORT:-5000}:5000"
     depends_on:
@@ -22,8 +25,11 @@ services:
     restart: unless-stopped
 
   recommendation-service:
-    build: ./recommendation-service
+    build:
+      context: .
+      dockerfile: recommendation-service/Dockerfile
     image: incrediblez7/5-final-design_ants-recommendation:${TAG:-latest}
+    env_file: ./recommendation-service/.env
     ports:
       - "${RECOMMENDATION_PORT:-8000}:8000"
     depends_on:
