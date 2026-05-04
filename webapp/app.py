@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 from urllib import error, parse, request
 
+import requests
 from flask import Flask, flash, redirect, render_template, request as flask_request, session, url_for
 
 CHECKIN_SERVICE_URL = os.getenv("CHECKIN_API", os.getenv("CHECKIN_SERVICE_URL", "http://checkin-service:5000"))
@@ -156,8 +157,32 @@ def session_logout():
     return redirect(url_for("home"))
 
 
-@app.route("/checkin")
+@app.route("/checkin", methods=["GET", "POST"])
 def checkin():
+    if flask_request.method == "POST":
+        payload = {
+            "user_id": flask_request.form.get("user_id") or _signed_in_user() or "",
+            "room_id": flask_request.form.get("room_id", "").strip(),
+            "crowdedness": flask_request.form.get("crowdedness"),
+            "quietness": flask_request.form.get("quietness"),
+        }
+        try:
+            response = requests.post(
+                f"{CHECKIN_SERVICE_URL}/api/checkins",
+                json=payload,
+                timeout=4,
+            )
+        except requests.RequestException as exc:
+            return f"Error: {exc}", 200
+
+        if response.status_code == 201:
+            return "Checkin successful", 200
+
+        detail = response.text.strip()
+        if detail:
+            return f"Checkin failed: {detail}", 200
+        return "Checkin failed", 200
+
     gate = _require_signin()
     if gate:
         return gate
