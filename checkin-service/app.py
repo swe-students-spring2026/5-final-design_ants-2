@@ -1,8 +1,16 @@
 import os
-from flask import Flask
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+# Load .env before importing anything that reads env vars (db.db caches MONGO_URI at import time).
+
+
+from flask import Flask  # noqa: E402
 from dotenv import load_dotenv
-from routes import bp
-from db import rooms_collection
+from routes import bp  # noqa: E402
+from db.seed_data import seed_rooms  # noqa: E402
+
 
 load_dotenv()
 
@@ -14,45 +22,6 @@ def create_app():
     seed_rooms()
 
     return app
-
-
-def seed_rooms():
-    """
-    Seed starter room data for local development.
-    Later, when using Docker + production MongoDB,
-    this can be replaced by a dedicated init script.
-    """
-    if rooms_collection.count_documents({}) == 0:
-        rooms_collection.insert_many([
-            {
-                "_id": "bobst_ll1",
-                "name": "Bobst LL1",
-                "current_crowd": None,
-                "current_quiet": None,
-                "last_updated": None
-            },
-            {
-                "_id": "bobst_2",
-                "name": "Bobst 2nd Floor",
-                "current_crowd": None,
-                "current_quiet": None,
-                "last_updated": None
-            },
-            {
-                "_id": "bobst_3",
-                "name": "Bobst 3rd Floor",
-                "current_crowd": None,
-                "current_quiet": None,
-                "last_updated": None
-            },
-            {
-                "_id": "bobst_4",
-                "name": "Bobst 4th Floor",
-                "current_crowd": None,
-                "current_quiet": None,
-                "last_updated": None
-            },
-        ])
 
 
 app = create_app()
