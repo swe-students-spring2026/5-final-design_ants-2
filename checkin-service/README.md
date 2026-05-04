@@ -17,7 +17,7 @@ cp .env.example .env
 python app.py
 ```
 
-The API is on `http://localhost:5001`. Room data is seeded automatically on first startup.
+The API is on `http://localhost:5000`. Room data is seeded automatically on first startup.
 
 ---
 
@@ -46,7 +46,7 @@ The API is on `http://localhost:5001`. Room data is seeded automatically on firs
 **Example request:**
 
 ```bash
-curl -X POST http://localhost:5001/api/checkins \
+curl -X POST http://localhost:5000/api/checkins \
   -H "Content-Type: application/json" \
   -d '{"user_id": "u1", "room_id": "bobst_ll1", "crowdedness": 2, "quietness": 4}'
 ```
@@ -76,7 +76,7 @@ On success the service also updates `current_crowd`, `current_quiet`, and `last_
 Returns all rooms with their latest snapshot.
 
 ```bash
-curl http://localhost:5001/api/rooms
+curl http://localhost:5000/api/rooms
 ```
 
 ```json
@@ -100,7 +100,7 @@ curl http://localhost:5001/api/rooms
 Returns all check-ins submitted by a user, newest first.
 
 ```bash
-curl http://localhost:5001/api/checkins/u1
+curl http://localhost:5000/api/checkins/u1
 ```
 
 ---
@@ -118,15 +118,6 @@ python app.py                 # dev server on :5001 with autoreload
 ```
 
 On first boot, four Bobst library rooms are seeded automatically if the `rooms` collection is empty.
-
-### With Docker Compose
-
-```bash
-docker build -t checkin-service .
-docker run -p 5001:5001 \
-  -e MONGO_URI=mongodb://host.docker.internal:27017/ \
-  checkin-service
-```
 
 ---
 
@@ -147,7 +138,7 @@ All configuration is via environment variables. See [`.env.example`](./.env.exam
 | `MONGO_URI` | `mongodb://localhost:27017/` | Connection string for MongoDB |
 | `DB_NAME` | `nyu_library_app` | Database name (shared with other services) |
 | `FLASK_ENV` | `development` | Set to `production` in prod |
-| `PORT` | `5001` | Port the Flask server listens on |
+| `PORT` | `5000` | Port the Flask server listens on |
 
 ---
 

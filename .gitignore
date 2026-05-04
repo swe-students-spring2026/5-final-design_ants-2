@@ -147,3 +147,6 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# Mongo bind-mount data (created at runtime by docker-compose mongodb service)
+mongodb/

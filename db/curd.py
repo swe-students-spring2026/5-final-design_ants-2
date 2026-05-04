@@ -1,5 +1,11 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
+
+from pymongo.database import Database
+
 from .db import users, rooms, checkins
+
+LIVE_WINDOW_DEFAULT_MINUTES = 30
 
 
 def create_user(user_id, username, email):
@@ -25,6 +31,56 @@ def get_all_rooms():
 
 def get_room_by_id(room_id):
     return rooms.find_one({"_id": room_id})
+
+
+def list_rooms(db: Optional[Database] = None) -> List[Dict[str, Any]]:
+    coll = db[rooms.name] if db is not None else rooms
+    return list(coll.find({}))
+
+
+def get_room(db: Optional[Database], room_id: Any) -> Optional[Dict[str, Any]]:
+    coll = db[rooms.name] if db is not None else rooms
+    return coll.find_one({"_id": room_id})
+
+
+def recent_checkins(
+    db: Optional[Database] = None,
+    room_id: Optional[Any] = None,
+    minutes: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    coll = db[checkins.name] if db is not None else checkins
+    window = minutes if minutes is not None else LIVE_WINDOW_DEFAULT_MINUTES
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=window)
+    query: Dict[str, Any] = {"time": {"$gte": cutoff}}
+    if room_id is not None:
+        query["room_id"] = room_id
+    return list(coll.find(query))
+
+
+def historical_checkins(
+    db: Optional[Database] = None,
+    room_id: Optional[Any] = None,
+    weekday: Optional[int] = None,
+    hour: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    coll = db[checkins.name] if db is not None else checkins
+    query: Dict[str, Any] = {}
+    if room_id is not None:
+        query["room_id"] = room_id
+    docs = list(coll.find(query))
+    if weekday is None and hour is None:
+        return docs
+    out = []
+    for d in docs:
+        t = d.get("time")
+        if not isinstance(t, datetime):
+            continue
+        if weekday is not None and t.weekday() != weekday:
+            continue
+        if hour is not None and t.hour != hour:
+            continue
+        out.append(d)
+    return out
 
 
 def create_checkin(user_id, room_id, crowdedness, quietness):

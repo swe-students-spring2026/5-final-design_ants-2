@@ -1,0 +1,38 @@
+name: CD
+
+on:
+  push:
+    branches: [dev]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USER }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push images
+        run: |
+          docker compose build
+          docker compose push
+
+      - name: Deploy to server
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIV_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ vars.SSH_HOST }} >> ~/.ssh/known_hosts
+          ssh ${{ secrets.SSH_USER }}@${{ vars.SSH_HOST }} "\
+            mkdir -p ${{ vars.DEPLOY_PATH }} && \
+            cd ${{ vars.DEPLOY_PATH }} && \
+            curl -sL https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/docker-compose.yml -o docker-compose.yml && \
+            export PORT=${{ vars.DEPLOY_PORT }} && \
+            export TAG=${{ vars.DOCKERHUB_TAG }} && \
+            docker compose pull && \
+            docker compose up -d"

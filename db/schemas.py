@@ -33,4 +33,22 @@ ROOMS_SEED = [
         "current_quiet": None,
         "last_updated": None,
     },
+    {
+        "_id": "bobst_3",
+        "name": "Bobst 3F",
+        "floor": "3",
+        "capacity": 200,
+        "current_crowd": None,
+        "current_quiet": None,
+        "last_updated": None,
+    },
+    {
+        "_id": "bobst_4",
+        "name": "Bobst 4F",
+        "floor": "4",
+        "capacity": 200,
+        "current_crowd": None,
+        "current_quiet": None,
+        "last_updated": None,
+    },
 ]

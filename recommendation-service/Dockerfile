@@ -1,34 +1,26 @@
-# syntax=docker/dockerfile:1.6
-
 FROM python:3.11-slim AS base
-
-# Don't write .pyc files; flush stdout/stderr immediately so logs show up.
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
 
 # Install dependencies in a separate layer so source changes don't bust the cache.
-COPY requirements.txt .
+COPY recommendation-service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application source.
-COPY app ./app
-COPY wsgi.py .
-COPY scripts ./scripts
+COPY db ./db
+COPY recommendation-service/app ./app
+COPY recommendation-service/wsgi.py .
+COPY recommendation-service/scripts ./scripts
 
-# Run as an unprivileged user.
-RUN useradd --create-home --shell /bin/bash appuser \
-    && chown -R appuser:appuser /app
-USER appuser
+ENV PORT=8000
+EXPOSE ${PORT}
 
-EXPOSE 8000
-
-# Healthcheck talks to our /healthz endpoint.
+# Healthcheck talks to our /healthz endpoint. ${PORT} is expanded by /bin/sh
+# at runtime, so changing PORT (via compose env) is picked up without rebuild.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request,sys;\
-sys.exit(0) if urllib.request.urlopen('http://localhost:8000/healthz', timeout=3).status==200 else sys.exit(1)" || exit 1
+sys.exit(0) if urllib.request.urlopen('http://localhost:${PORT}/healthz', timeout=3).status==200 else sys.exit(1)" || exit 1
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--access-logfile", "-", "wsgi:application"]
+# `sh -c "exec ..."` so ${PORT} expands at runtime AND gunicorn becomes PID 1
+# (so SIGTERM still reaches it for graceful shutdown).
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} --workers 2 --access-logfile - wsgi:application"]

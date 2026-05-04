@@ -159,36 +159,6 @@ The required ones for production are:
 
 ---
 
-## Container image
-
-Built and pushed by GitHub Actions on every merge to `main` to:
-
-- `docker.io/<DOCKERHUB_USERNAME>/library-recommendation-service:latest`
-- `docker.io/<DOCKERHUB_USERNAME>/library-recommendation-service:<sha>`
-
-The Dockerfile runs the app under gunicorn with two workers as a non-root user and ships a built-in healthcheck.
-
----
-
-## CI/CD
-
-`.github/workflows/recommendation-service.yml` triggers on any push or PR to `main`/`master` that touches this subsystem. The pipeline:
-
-1. Installs dependencies and runs `pytest` (which gates on 80 % coverage).
-2. On a successful merge to `main`, builds the Docker image and pushes it to Docker Hub.
-3. Triggers a redeploy of the Digital Ocean App so it pulls the new image.
-
-The following GitHub repository secrets must be set at the repo level:
-
-| Secret | Purpose |
-| --- | --- |
-| `DOCKERHUB_USERNAME` | Docker Hub account that owns the image repo |
-| `DOCKERHUB_TOKEN` | Docker Hub access token with push rights |
-| `DIGITALOCEAN_ACCESS_TOKEN` | DO API token used by `doctl` |
-| `DO_APP_ID` | The App Platform application ID to redeploy |
-
----
-
 ## Troubleshooting
 
 **`Cannot connect to the Docker daemon`** — Docker Desktop isn't running. On macOS: `open -a Docker`, then wait until the whale icon stops animating.

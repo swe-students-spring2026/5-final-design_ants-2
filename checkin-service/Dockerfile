@@ -2,11 +2,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY checkin-service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY db ./db
+COPY checkin-service .
 
-EXPOSE 5001
+ENV PORT=5000
+EXPOSE ${PORT}
 
 CMD ["python", "app.py"]
