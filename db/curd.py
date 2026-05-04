@@ -9,6 +9,9 @@ LIVE_WINDOW_DEFAULT_MINUTES = 30
 
 
 def create_user(user_id, username, email):
+    existing = users.find_one({"_id": user_id})
+    if existing:
+        return existing
     now = datetime.now(timezone.utc)
 
     user = {
@@ -84,6 +87,10 @@ def historical_checkins(
 
 
 def create_checkin(user_id, room_id, crowdedness, quietness):
+    user = users.find_one({"_id": user_id})
+    if not user:
+        raise ValueError(f"User does not exist: {user_id}")
+    
     now = datetime.now(timezone.utc)
 
     room = rooms.find_one({"_id": room_id})
