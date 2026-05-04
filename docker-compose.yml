@@ -44,13 +44,15 @@ services:
     restart: unless-stopped
 
   webapp:
-    build: ./webapp
+    build:
+      context: .
+      dockerfile: webapp/Dockerfile
+    image: incrediblez7/5-final-design_ants-webapp:${TAG:-latest}
     ports:
-      - "3000:5000"
+      - "${WEBAPP_PORT:-3000}:3000"
     depends_on:
-      - checkin-service
-      - recommendation-service
+      checkin-service:
+        condition: service_started
+      recommendation-service:
+        condition: service_started
     restart: unless-stopped
-
-volumes:
-  mongodb_data:
