@@ -2,14 +2,14 @@ services:
   mongodb:
     image: mongo:7
     ports:
-      - "27019:27017"
+      - "27018:27017"
     volumes:
-      - ./mongodb:/data/db
+      - mongodb_data:/data/db
     healthcheck:
       test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok' | grep -q 1"]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
       start_period: 20s
     restart: unless-stopped
 
@@ -36,10 +36,10 @@ services:
     image: incrediblez7/5-final-design_ants-recommendation:${TAG:-latest}
     env_file: ./recommendation-service/.env
     ports:
-      - "${RECOMMENDATION_PORT:-8000}:8000"
+      - "${RECOMMENDATION_PORT:-8001}:8000"
     environment:
       - MONGO_URI=mongodb://mongodb:27017/
-      - DB_NAME=nyu_library_app
+      - DB_NAME=library_app
     depends_on:
       mongodb:
         condition: service_healthy
@@ -58,3 +58,6 @@ services:
       recommendation-service:
         condition: service_started
     restart: unless-stopped
+
+volumes:
+  mongodb_data:
