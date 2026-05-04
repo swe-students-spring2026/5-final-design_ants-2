@@ -1,64 +1,42 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from statistics import mean
-from typing import Any, Dict, List, Optional, Tuple
 
 from .config import Config
+from .db import parse_time
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _avg(values: List[float], default: float) -> float:
+def _avg(values, default):
     return float(mean(values)) if values else float(default)
 
 
-def _study_score(crowd: float, quiet: float) -> float:
+def _study_score(crowd, quiet):
     spaciousness = 6.0 - crowd
     return round(spaciousness + quiet, 2)
 
 
-# ---------------------------------------------------------------------------
-# Algorithm 1: simple weighted score
-# ---------------------------------------------------------------------------
-
-def weighted_score(
-    room: Dict[str, Any],
-    live_checkins: List[Dict[str, Any]],
-    historical_checkins: List[Dict[str, Any]],
-    live_weight: Optional[float] = None,
-) -> Dict[str, Any]:
-    """Score a single room by blending live and historical signal.
-
-    If there is no live data, the score falls back fully to history.
-    If there is no history either, we use the configured defaults so that
-    the room is still rankable rather than dropped.
-    """
+def weighted_score(room, live_checkins, historical_checkins, live_weight=None):
     w = Config.LIVE_WEIGHT if live_weight is None else float(live_weight)
     w = max(0.0, min(1.0, w))
 
-    live_crowd_vals = [c["crowdedness"] for c in live_checkins if "crowdedness" in c]
-    live_quiet_vals = [c["quietness"] for c in live_checkins if "quietness" in c]
+    live_crowd = [c["crowdedness"] for c in live_checkins if "crowdedness" in c]
+    live_quiet = [c["quietness"] for c in live_checkins if "quietness" in c]
+    hist_crowd = [c["crowdedness"] for c in historical_checkins if "crowdedness" in c]
+    hist_quiet = [c["quietness"] for c in historical_checkins if "quietness" in c]
 
-    hist_crowd_vals = [c["crowdedness"] for c in historical_checkins if "crowdedness" in c]
-    hist_quiet_vals = [c["quietness"] for c in historical_checkins if "quietness" in c]
-
-    has_live = bool(live_crowd_vals or live_quiet_vals)
-    has_hist = bool(hist_crowd_vals or hist_quiet_vals)
+    has_live = bool(live_crowd or live_quiet)
+    has_hist = bool(hist_crowd or hist_quiet)
 
     if has_live and has_hist:
-        crowd = w * _avg(live_crowd_vals, Config.DEFAULT_CROWD) + \
-                (1 - w) * _avg(hist_crowd_vals, Config.DEFAULT_CROWD)
-        quiet = w * _avg(live_quiet_vals, Config.DEFAULT_QUIET) + \
-                (1 - w) * _avg(hist_quiet_vals, Config.DEFAULT_QUIET)
+        crowd = w * _avg(live_crowd, Config.DEFAULT_CROWD) + (1 - w) * _avg(hist_crowd, Config.DEFAULT_CROWD)
+        quiet = w * _avg(live_quiet, Config.DEFAULT_QUIET) + (1 - w) * _avg(hist_quiet, Config.DEFAULT_QUIET)
         source = "live+history"
     elif has_live:
-        crowd = _avg(live_crowd_vals, Config.DEFAULT_CROWD)
-        quiet = _avg(live_quiet_vals, Config.DEFAULT_QUIET)
+        crowd = _avg(live_crowd, Config.DEFAULT_CROWD)
+        quiet = _avg(live_quiet, Config.DEFAULT_QUIET)
         source = "live"
     elif has_hist:
-        crowd = _avg(hist_crowd_vals, Config.DEFAULT_CROWD)
-        quiet = _avg(hist_quiet_vals, Config.DEFAULT_QUIET)
+        crowd = _avg(hist_crowd, Config.DEFAULT_CROWD)
+        quiet = _avg(hist_quiet, Config.DEFAULT_QUIET)
         source = "history"
     else:
         crowd = Config.DEFAULT_CROWD
@@ -72,18 +50,12 @@ def weighted_score(
         "quiet": round(quiet, 2),
         "study_score": _study_score(crowd, quiet),
         "source": source,
-        "live_sample_size": len(live_crowd_vals),
-        "history_sample_size": len(hist_crowd_vals),
+        "live_sample_size": len(live_crowd),
+        "history_sample_size": len(hist_crowd),
     }
 
 
-def rank_rooms_weighted(
-    rooms: List[Dict[str, Any]],
-    live_by_room: Dict[Any, List[Dict[str, Any]]],
-    history_by_room: Dict[Any, List[Dict[str, Any]]],
-    live_weight: Optional[float] = None,
-) -> List[Dict[str, Any]]:
-    """Score and rank a list of rooms, best for studying first."""
+def rank_rooms_weighted(rooms, live_by_room, history_by_room, live_weight=None):
     scored = [
         weighted_score(
             r,
@@ -97,39 +69,17 @@ def rank_rooms_weighted(
     return scored
 
 
-# ---------------------------------------------------------------------------
-# Algorithm 2: weekday/hour bucket forecast
-# ---------------------------------------------------------------------------
-
-def _bucket_key(t: datetime) -> Tuple[int, int]:
-    return (t.weekday(), t.hour)
-
-
-def forecast_score(
-    room: Dict[str, Any],
-    historical_checkins: List[Dict[str, Any]],
-    target_weekday: int,
-    target_hour: int,
-) -> Dict[str, Any]:
-    """Predict the score for ``room`` at the given (weekday, hour) slot.
-
-    Strategy:
-      1. Prefer checkins matching exactly (weekday, hour).
-      2. If too few samples, widen to same hour on any weekday.
-      3. If still empty, fall back to all historical data for the room.
-      4. If still empty, fall back to defaults.
-    """
-    exact: List[Dict[str, Any]] = []
-    same_hour: List[Dict[str, Any]] = []
+def forecast_score(room, historical_checkins, target_weekday, target_hour):
+    exact = []
+    same_hour = []
 
     for c in historical_checkins:
-        t = c.get("time")
-        if not isinstance(t, datetime):
+        t = parse_time(c.get("time"))
+        if t is None:
             continue
-        wd, hr = _bucket_key(t)
-        if hr == target_hour:
+        if t.hour == target_hour:
             same_hour.append(c)
-            if wd == target_weekday:
+            if t.weekday() == target_weekday:
                 exact.append(c)
 
     if len(exact) >= 3:
@@ -160,14 +110,8 @@ def forecast_score(
     }
 
 
-def rank_rooms_forecast(
-    rooms: List[Dict[str, Any]],
-    history_by_room: Dict[Any, List[Dict[str, Any]]],
-    target_weekday: Optional[int] = None,
-    target_hour: Optional[int] = None,
-) -> List[Dict[str, Any]]:
-    """Score and rank rooms for a (weekday, hour). Defaults to "now" in UTC."""
-    now = datetime.now(timezone.utc)
+def rank_rooms_forecast(rooms, history_by_room, target_weekday=None, target_hour=None):
+    now = datetime.utcnow()
     wd = now.weekday() if target_weekday is None else target_weekday
     hr = now.hour if target_hour is None else target_hour
 

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Library Study App (Dummy)</title>
+</head>
+<body>
+    <h1>Library Study App Dummy UI</h1>
+
+    <h2>1. Current Room Status (from checkin-service)</h2>
+    <table border="1">
+        <tr><th>Room ID</th><th>Name</th><th>Crowdedness</th><th>Quietness</th></tr>
+        {% for room in rooms %}
+        <tr>
+            <td>{{ room._id }}</td>
+            <td>{{ room.name }}</td>
+            <td>{{ room.current_crowd }}</td>
+            <td>{{ room.current_quiet }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h2>2. Recommended Rooms (from recommendation-service)</h2>
+    <table border="1">
+        <tr><th>Room Name</th><th>Study Score</th><th>Crowd</th><th>Quiet</th><th>Source</th></tr>
+        {% for rec in recommendations %}
+        <tr>
+            <td>{{ rec.name }}</td>
+            <td>{{ rec.study_score }}</td>
+            <td>{{ rec.crowd }}</td>
+            <td>{{ rec.quiet }}</td>
+            <td>{{ rec.source }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h2>3. Check-In</h2>
+    <form action="/checkin" method="POST">
+        <label>Room ID:</label>
+        <select name="room_id">
+            {% for room in rooms %}
+            <option value="{{ room._id }}">{{ room.name }}</option>
+            {% endfor %}
+        </select><br><br>
+        <label>Crowdedness (1-5):</label>
+        <input type="number" name="crowdedness" min="1" max="5" value="3"><br><br>
+        <label>Quietness (1-5):</label>
+        <input type="number" name="quietness" min="1" max="5" value="3"><br><br>
+        <button type="submit">Check In</button>
+    </form>
+</body>
+</html>

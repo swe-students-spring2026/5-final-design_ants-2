@@ -1,36 +1,62 @@
-"""Thin shim. Real DB code lives in the shared top-level `db/` package."""
-import os
-import sys
+from datetime import datetime, timedelta
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+from pymongo import MongoClient
 
-from db.db import client as _shared_client  # noqa: E402, F401
-from db.db import db as _shared_db  # noqa: E402
-from db.curd import (  # noqa: E402, F401
-    get_room,
-    historical_checkins,
-    list_rooms,
-)
-from db.curd import recent_checkins as _shared_recent_checkins  # noqa: E402
-
-from .config import Config  # noqa: E402
+from .config import Config
 
 
-def get_client(uri=None):
-    return _shared_client
+client = MongoClient(Config.MONGO_URI)
+db = client[Config.DB_NAME]
+
+rooms_collection = db["rooms"]
+checkins_collection = db["checkins"]
 
 
-def get_db(uri=None, db_name=None):
-    return _shared_db
+def list_rooms():
+    return list(rooms_collection.find({}))
 
 
-def reset_client():
-    """Kept for tests; shared module owns the real lifecycle."""
-    pass
+def get_room(room_id):
+    return rooms_collection.find_one({"_id": room_id})
 
 
-def recent_checkins(db=None, room_id=None, minutes=None):
-    """Wrap shared recent_checkins so the rec service's LIVE_WINDOW_MINUTES env var still applies."""
-    if minutes is None:
-        minutes = Config.LIVE_WINDOW_MINUTES
-    return _shared_recent_checkins(db, room_id=room_id, minutes=minutes)
+def recent_checkins(room_id=None, minutes=None):
+    window = minutes if minutes is not None else Config.LIVE_WINDOW_MINUTES
+    cutoff = (datetime.utcnow() - timedelta(minutes=window)).isoformat()
+    query = {"time": {"$gte": cutoff}}
+    if room_id is not None:
+        query["room_id"] = room_id
+    return list(checkins_collection.find(query))
+
+
+def historical_checkins(room_id=None, weekday=None, hour=None):
+    query = {}
+    if room_id is not None:
+        query["room_id"] = room_id
+    docs = list(checkins_collection.find(query))
+
+    if weekday is None and hour is None:
+        return docs
+
+    filtered = []
+    for doc in docs:
+        t = parse_time(doc.get("time"))
+        if t is None:
+            continue
+        if weekday is not None and t.weekday() != weekday:
+            continue
+        if hour is not None and t.hour != hour:
+            continue
+        filtered.append(doc)
+    return filtered
+
+
+def parse_time(value):
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            return None
+    return None
