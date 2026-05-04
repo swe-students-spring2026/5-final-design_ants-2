@@ -1,28 +1,4 @@
-"""Flask application exposing the recommendation endpoints.
-
-Endpoints
----------
-GET  /healthz
-    Liveness probe used by Docker / Digital Ocean.
-
-GET  /api/rooms
-    List all rooms with their stored "current" snapshot.
-
-GET  /api/recommend
-    Live + history blended recommendation (Algorithm 1).
-    Query params:
-      - live_weight: float in [0, 1], overrides the default blend.
-      - top: int, return only the top N rooms.
-
-GET  /api/forecast
-    Weekday/hour bucketed forecast (Algorithm 2).
-    Query params:
-      - weekday: 0=Mon .. 6=Sun (defaults to now, UTC).
-      - hour:    0..23 (defaults to now, UTC).
-      - top: int, return only the top N rooms.
-"""
 from datetime import datetime, timezone
-from typing import Any, Dict
 
 from flask import Flask, jsonify, request
 from pymongo.errors import PyMongoError
@@ -32,35 +8,21 @@ from .config import Config
 from .recommender import rank_rooms_forecast, rank_rooms_weighted
 
 
-def create_app(db_override=None) -> Flask:
-    """Application factory. ``db_override`` lets tests inject a fake DB."""
+def create_app():
     app = Flask(__name__)
 
-    def _db():
-        return db_override if db_override is not None else db_module.get_db()
-
-    # -----------------------------------------------------------------------
-    # Health check
-    # -----------------------------------------------------------------------
     @app.get("/healthz")
     def healthz():
         return jsonify({"status": "ok", "service": "recommendation"}), 200
 
-    # -----------------------------------------------------------------------
-    # Rooms listing — useful for the frontend dropdown / debug
-    # -----------------------------------------------------------------------
     @app.get("/api/rooms")
     def list_rooms():
         try:
-            rooms = db_module.list_rooms(_db())
+            rooms = db_module.list_rooms()
         except PyMongoError as exc:
             return jsonify({"error": "database_error", "detail": str(exc)}), 503
-
         return jsonify({"rooms": [_serialize_room(r) for r in rooms]}), 200
 
-    # -----------------------------------------------------------------------
-    # Algorithm 1 — live + history blend
-    # -----------------------------------------------------------------------
     @app.get("/api/recommend")
     def recommend():
         try:
@@ -70,14 +32,13 @@ def create_app(db_override=None) -> Flask:
             return jsonify({"error": "bad_request", "detail": str(exc)}), 400
 
         try:
-            db = _db()
-            rooms = db_module.list_rooms(db)
-            live_by_room: Dict[Any, list] = {}
-            history_by_room: Dict[Any, list] = {}
-            for room in rooms:
-                rid = room["_id"]
-                live_by_room[rid] = db_module.recent_checkins(db, room_id=rid)
-                history_by_room[rid] = db_module.historical_checkins(db, room_id=rid)
+            rooms = db_module.list_rooms()
+            live_by_room = {
+                r["_id"]: db_module.recent_checkins(room_id=r["_id"]) for r in rooms
+            }
+            history_by_room = {
+                r["_id"]: db_module.historical_checkins(room_id=r["_id"]) for r in rooms
+            }
         except PyMongoError as exc:
             return jsonify({"error": "database_error", "detail": str(exc)}), 503
 
@@ -87,19 +48,14 @@ def create_app(db_override=None) -> Flask:
         if top is not None:
             ranked = ranked[:top]
 
-        return jsonify(
-            {
-                "algorithm": "weighted",
-                "live_weight": live_weight if live_weight is not None else Config.LIVE_WEIGHT,
-                "live_window_minutes": Config.LIVE_WINDOW_MINUTES,
-                "generated_at": datetime.now(timezone.utc).isoformat(),
-                "recommendations": ranked,
-            }
-        ), 200
+        return jsonify({
+            "algorithm": "weighted",
+            "live_weight": live_weight if live_weight is not None else Config.LIVE_WEIGHT,
+            "live_window_minutes": Config.LIVE_WINDOW_MINUTES,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "recommendations": ranked,
+        }), 200
 
-    # -----------------------------------------------------------------------
-    # Algorithm 2 — weekday/hour forecast
-    # -----------------------------------------------------------------------
     @app.get("/api/forecast")
     def forecast():
         try:
@@ -110,11 +66,9 @@ def create_app(db_override=None) -> Flask:
             return jsonify({"error": "bad_request", "detail": str(exc)}), 400
 
         try:
-            db = _db()
-            rooms = db_module.list_rooms(db)
-            history_by_room: Dict[Any, list] = {
-                r["_id"]: db_module.historical_checkins(db, room_id=r["_id"])
-                for r in rooms
+            rooms = db_module.list_rooms()
+            history_by_room = {
+                r["_id"]: db_module.historical_checkins(room_id=r["_id"]) for r in rooms
             }
         except PyMongoError as exc:
             return jsonify({"error": "database_error", "detail": str(exc)}), 503
@@ -126,26 +80,19 @@ def create_app(db_override=None) -> Flask:
             ranked = ranked[:top]
 
         now = datetime.now(timezone.utc)
-        return jsonify(
-            {
-                "algorithm": "forecast",
-                "target_weekday": weekday if weekday is not None else now.weekday(),
-                "target_hour": hour if hour is not None else now.hour,
-                "generated_at": now.isoformat(),
-                "recommendations": ranked,
-            }
-        ), 200
+        return jsonify({
+            "algorithm": "forecast",
+            "target_weekday": weekday if weekday is not None else now.weekday(),
+            "target_hour": hour if hour is not None else now.hour,
+            "generated_at": now.isoformat(),
+            "recommendations": ranked,
+        }), 200
 
     return app
 
 
-# ---------------------------------------------------------------------------
-# Small helpers
-# ---------------------------------------------------------------------------
-
-def _serialize_room(room: Dict[str, Any]) -> Dict[str, Any]:
-    """Make a room dict JSON-friendly (stringify ObjectId, ISO datetimes)."""
-    out: Dict[str, Any] = {}
+def _serialize_room(room):
+    out = {}
     for k, v in room.items():
         if k == "_id":
             out["room_id"] = str(v)
@@ -179,13 +126,8 @@ def _parse_int(raw, lo=None, hi=None):
     return val
 
 
-# Module-level app for gunicorn. Created lazily so tests don't trigger a
-# real Mongo connection just by importing this module.
-app = None
+app = create_app()
 
 
 def get_app():
-    global app
-    if app is None:
-        app = create_app()
     return app

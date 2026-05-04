@@ -1,31 +1,26 @@
-name: checkin-service CI/CD
+name: webapp CI/CD
 
 on:
   push:
     branches: [main, master]
     paths:
-      - "checkin-service/**"
-      - ".github/workflows/checkin-service.yml"
+      - "webapp/**"
+      - ".github/workflows/webapp.yml"
   pull_request:
     branches: [main, master]
     paths:
-      - "checkin-service/**"
-      - ".github/workflows/checkin-service.yml"
+      - "webapp/**"
+      - ".github/workflows/webapp.yml"
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/library-checkin-service
-  WORKDIR: checkin-service
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/library-webapp
+  WORKDIR: webapp
 
 jobs:
   test:
     name: Lint & Test
     runs-on: ubuntu-latest
-    services:
-      mongodb:
-        image: mongo:7
-        ports:
-          - 27017:27017
     defaults:
       run:
         working-directory: ${{ env.WORKDIR }}
@@ -37,10 +32,10 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: ${{ env.WORKDIR }}/requirements.txt
+          cache-dependency-path: ${{ env.WORKDIR }}/requirements-dev.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
 
       - name: Run pytest with coverage gate
         run: pytest
