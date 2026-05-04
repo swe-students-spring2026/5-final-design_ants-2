@@ -36,3 +36,17 @@ services:
       mongodb:
         condition: service_healthy
     restart: unless-stopped
+
+  webapp:
+    build:
+      context: .
+      dockerfile: webapp/Dockerfile
+    image: incrediblez7/5-final-design_ants-webapp:${TAG:-latest}
+    ports:
+      - "${WEBAPP_PORT:-3000}:3000"
+    depends_on:
+      checkin-service:
+        condition: service_started
+      recommendation-service:
+        condition: service_started
+    restart: unless-stopped
