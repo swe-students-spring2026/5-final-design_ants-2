@@ -10,6 +10,8 @@
 
 A web app for finding the best place to study on the campus. Students report how crowded and quiet each floor is, and the system blends those live reports with historical patterns to rank rooms by "study-ability".
 
+App is live [here](https://lock-in.space/). We suggest mobile dimensions for best experience.
+
 ## Team
 
 - [Roger](https://github.com/DaobaRoger12)
@@ -115,9 +117,9 @@ The `webapp` service shares `checkin-service/.env` (it needs the same Google OAu
 
 ## Branches & deployment
 
-- `main` — stable integration branch
-- `dev` — pushes here trigger the `deploy.yml` workflow that builds, pushes images to Docker Hub, and deploys to the dev environment
-- `prod` — production branch; deploys behind `lock-in.space`
+- `main` is the stable integration branch
+- `dev` pushes here trigger the `deploy.yml` workflow that builds, pushes images to Docker Hub, and deploys to the dev environment for QA
+- `prod` is the production branch; deploys behind `lock-in.space`
 
 ## License
 
