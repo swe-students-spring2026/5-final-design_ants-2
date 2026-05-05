@@ -53,7 +53,7 @@
         <div class="history-list">
           {% for item in checkins[:10] %}
             <div class="history-item">
-              <span>{{ item.room_id }}</span>
+              <span>{{ item.room_name }}</span>
               <span>Crowd {{ item.crowdedness }}</span>
               <span>Quiet {{ item.quietness }}</span>
             </div>
@@ -74,7 +74,7 @@
           {% for rec in recommendations %}
             <article class="data-tile">
               <p class="kicker">Score {{ rec.score if rec.score is not none else "n/a" }}</p>
-              <h3>{{ rec.room_name if rec.room_name else rec.room_id }}</h3>
+              <h3>{{ rec.room_name if rec.room_name else "Study room" }}</h3>
             </article>
           {% endfor %}
         </div>

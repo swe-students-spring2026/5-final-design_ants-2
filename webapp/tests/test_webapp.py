@@ -2,6 +2,7 @@ import pytest
 import requests_mock
 import app as webapp_module
 from app import app
+from datetime import datetime, timedelta
 
 @pytest.fixture
 def client():
@@ -16,7 +17,7 @@ def test_index_success(client):
         response = client.get('/')
         assert response.status_code == 200
         assert b'u1' not in response.data
-        assert b'Google' in response.data
+        assert b'Sign in to punch in' in response.data
 
 def test_index_api_error(client):
     with requests_mock.Mocker() as m:
@@ -24,6 +25,143 @@ def test_index_api_error(client):
         m.get('http://recommendation-service:8000/api/recommend?top=5', status_code=500)
         response = client.get('/')
         assert response.status_code == 200
+
+
+def test_debug_home_cta_visible(client):
+    response = client.get('/debug/home/cta')
+
+    assert response.status_code == 200
+    assert b'Punch in' in response.data
+    assert b'packed' in response.data
+    assert b'quiet' in response.data
+    assert b'debug_ll2' not in response.data
+
+
+def test_debug_home_cta_hidden(client):
+    response = client.get('/debug/home/done')
+
+    assert response.status_code == 200
+    assert b"You've Punched In Today!" in response.data
+    assert b'You are really locked in.' in response.data
+    assert b'Punch in again' not in response.data
+    assert b'Bobst LL2' in response.data
+    assert b'Bobst 9F' in response.data
+
+
+def test_debug_home_cooldown(client):
+    response = client.get('/debug/home/cooldown')
+
+    assert response.status_code == 200
+    assert b"You've Punched In Today!" in response.data
+    assert b'You are really locked in.' in response.data
+    assert b'Punch cooldown' not in response.data
+
+
+def test_debug_checkin_bypass_cooldown_opens_flow(client, monkeypatch):
+    recent_checkin = {
+        'room_id': 'bobst_3',
+        'time': datetime.now(webapp_module.USER_TIMEZONE).isoformat(),
+    }
+    monkeypatch.setattr(
+        webapp_module,
+        '_room_options',
+        lambda: ([{'_id': 'bobst_3', 'name': 'Bobst 3F'}], None),
+    )
+    monkeypatch.setattr(
+        webapp_module,
+        '_recent_user_checkins',
+        lambda user_id: ([recent_checkin], None),
+    )
+    with client.session_transaction() as sess:
+        sess['user_id'] = 'person@nyu.edu'
+
+    response = client.get('/debug/checkin/bypass-cooldown', follow_redirects=True)
+
+    assert response.status_code == 200
+    assert b'Bobst 3F' in response.data
+    assert b'Punch cooldown active' not in response.data
+    with client.session_transaction() as sess:
+        assert sess['debug_bypass_checkin_cooldown'] is True
+
+
+def test_checkin_step1_hides_room_ids_and_last_room(client, monkeypatch):
+    monkeypatch.setattr(
+        webapp_module,
+        '_room_options',
+        lambda: ([{'_id': 'bobst_3', 'name': 'Bobst 3F'}], None),
+    )
+    monkeypatch.setattr(webapp_module, '_recent_user_checkins', lambda user_id: ([], None))
+    with client.session_transaction() as sess:
+        sess['user_id'] = 'person@nyu.edu'
+
+    response = client.get('/checkin/step1')
+
+    assert response.status_code == 200
+    assert b'Bobst 3F' in response.data
+    assert b'Last room' not in response.data
+    assert b'Last used' not in response.data
+
+
+def test_checkin_step1_repeat_requires_confirmation(client, monkeypatch):
+    rooms = [{'_id': 'bobst_3', 'name': 'Bobst 3F'}]
+    old_checkin = {
+        'room_id': 'bobst_3',
+        'time': (datetime.now(webapp_module.USER_TIMEZONE) - timedelta(minutes=31)).isoformat(),
+    }
+    monkeypatch.setattr(webapp_module, '_room_options', lambda: (rooms, None))
+    monkeypatch.setattr(
+        webapp_module,
+        '_recent_user_checkins',
+        lambda user_id: ([old_checkin], None),
+    )
+    with client.session_transaction() as sess:
+        sess['user_id'] = 'person@nyu.edu'
+
+    response = client.post('/checkin/step1', data={'room_id': 'bobst_3'})
+
+    assert response.status_code == 200
+    assert b'Are you sure you returned to Bobst 3F and want to punch in again?' in response.data
+
+
+def test_checkin_step1_skips_repeat_confirmation_for_different_room(client, monkeypatch):
+    rooms = [
+        {'_id': 'bobst_3', 'name': 'Bobst 3F'},
+        {'_id': 'bobst_ll1', 'name': 'Bobst LL1'},
+    ]
+    old_checkin = {
+        'room_id': 'bobst_ll1',
+        'time': (datetime.now(webapp_module.USER_TIMEZONE) - timedelta(minutes=31)).isoformat(),
+    }
+    monkeypatch.setattr(webapp_module, '_room_options', lambda: (rooms, None))
+    monkeypatch.setattr(
+        webapp_module,
+        '_recent_user_checkins',
+        lambda user_id: ([old_checkin], None),
+    )
+    with client.session_transaction() as sess:
+        sess['user_id'] = 'person@nyu.edu'
+
+    response = client.post('/checkin/step1', data={'room_id': 'bobst_3'})
+
+    assert response.status_code == 302
+    assert response.headers['Location'].endswith('/checkin/step2')
+
+
+def test_checkin_hook_plain_punch_success(client, monkeypatch):
+    monkeypatch.setattr(
+        webapp_module,
+        '_recent_user_checkins',
+        lambda user_id: ([{'room_id': 'bobst_3', 'time': '2026-05-04T12:00:00'}], None),
+    )
+    with client.session_transaction() as sess:
+        sess['user_id'] = 'person@nyu.edu'
+        sess['last_checkin'] = {'room_id': 'bobst_3'}
+
+    response = client.get('/checkin/hook')
+
+    assert response.status_code == 200
+    assert b"You've punched in!" in response.data
+    assert b'Students helped' not in response.data
 
 def test_checkin_success(client):
     with requests_mock.Mocker() as m:

@@ -1,10 +1,11 @@
 from flask import Blueprint, request, jsonify, render_template
-from datetime import datetime
+from datetime import datetime, timezone
 from db.db import checkins as checkins_collection, rooms as rooms_collection, users as users_collection
 from db.schemas import DEFAULT_USER_EMOJI
 
 bp = Blueprint("main", __name__)
 EMOJI_MAX_LENGTH = 16
+CHECKIN_COOLDOWN_SECONDS = 30 * 60
 
 
 def _serialize_user(user):
@@ -30,6 +31,35 @@ def _clean_emoji(value):
     if not emoji or len(emoji) > EMOJI_MAX_LENGTH:
         return None
     return emoji
+
+
+def _checkin_datetime(value):
+    if isinstance(value, datetime):
+        if value.tzinfo:
+            return value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value
+    if isinstance(value, str):
+        try:
+            checkin_time = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if checkin_time.tzinfo:
+            checkin_time = checkin_time.astimezone(timezone.utc).replace(tzinfo=None)
+        return checkin_time
+    return None
+
+
+def _checkin_cooldown_remaining(user_id):
+    latest = checkins_collection.find_one({"user_id": user_id}, sort=[("time", -1)])
+    if not latest:
+        return 0
+
+    latest_time = _checkin_datetime(latest.get("time"))
+    if not latest_time:
+        return 0
+
+    elapsed = datetime.utcnow() - latest_time
+    return max(0, CHECKIN_COOLDOWN_SECONDS - int(elapsed.total_seconds()))
 
 
 @bp.route("/")
@@ -156,6 +186,19 @@ def create_checkin():
         if field not in data:
             return jsonify({"error": f"Missing field: {field}"}), 400
 
+    user_id = str(data["user_id"]).strip()
+    if not user_id:
+        return jsonify({"error": "Missing field: user_id"}), 400
+
+    remaining = _checkin_cooldown_remaining(user_id)
+    if remaining > 0 and data.get("debug_bypass_cooldown") is not True:
+        return jsonify(
+            {
+                "error": "Punch cooldown active",
+                "retry_after_seconds": remaining,
+            }
+        ), 429
+
     crowdedness = data["crowdedness"]
     quietness = data["quietness"]
     room_id = data["room_id"]
@@ -173,7 +216,7 @@ def create_checkin():
     current_time = datetime.utcnow().isoformat()
 
     checkin_doc = {
-        "user_id": data["user_id"],
+        "user_id": user_id,
         "room_id": room_id,
         "time": current_time,
         "crowdedness": crowdedness,
