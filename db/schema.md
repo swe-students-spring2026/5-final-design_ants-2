@@ -2,6 +2,7 @@ users {
 \_id: string,
 username: string,
 email: string,
+emoji: string,
 created_at: datetime,
 credits: int
 }

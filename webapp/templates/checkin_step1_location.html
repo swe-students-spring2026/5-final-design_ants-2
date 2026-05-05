@@ -5,9 +5,9 @@
     <div class="flow-copy">
       <div class="step-meta">
         <span class="step-chip">01</span>
-        <p class="eyebrow">Required / 3 taps</p>
+        <p class="eyebrow">Step 1 of 3</p>
       </div>
-      <h1 class="step-title">Location</h1>
+      <h1 class="step-title">Where are you?</h1>
     {% if smart_default_room %}
       <p class="step-copy">Last room: {{ smart_default_room }}</p>
     {% endif %}
@@ -20,7 +20,9 @@
             <button class="choice-button{% if room._id == smart_default_room %} is-recommended{% endif %}" type="submit">
               <span>
                 <strong>{{ room.name if room.name else room._id }}</strong>
-                <small>{{ room._id }}{% if room._id == smart_default_room %} / Last{% endif %}</small>
+                <small>
+                  {% if room.name and room.name != room._id %}{{ room._id }}{% else %}Tap to select{% endif %}{% if room._id == smart_default_room %} / Last used{% endif %}
+                </small>
               </span>
             </button>
           </form>

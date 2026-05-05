@@ -2,43 +2,45 @@
 
 {% block content %}
   {% if not user_id %}
-    <section class="profile-hero">
-      <div class="profile-copy">
+    <section class="auth-shell">
+      <div class="auth-copy">
         <p class="eyebrow">Session</p>
-        <h1 class="display">Sign In</h1>
-        <p class="subline">Google OAuth</p>
+        <h1 class="display">Sign in to punch in.</h1>
+        <p class="subline">Use your NYU Google account to log room check-ins and keep your streak.</p>
         <div class="hero-actions">
-          <a class="button button--yellow button--full" href="{{ url_for('session_login') }}">Google</a>
-          {% if not oauth_ready %}
-            <span class="button button--paper button--full">Env Needed</span>
-          {% endif %}
+          <a class="button button--primary button--full" href="{{ url_for('session_login') }}">Google sign in</a>
         </div>
+        {% if not oauth_ready %}
+          <p class="profile-context">Google OAuth environment variables are not configured.</p>
+        {% endif %}
       </div>
 
-      <div class="profile-geometry" aria-hidden="true">
-        <div class="geo-cell geo-red"><span class="geo-circle is-black"></span></div>
+      <div class="auth-geometry" aria-hidden="true">
+        <div class="geo-cell geo-blue"><span class="geo-circle is-black"></span></div>
         <div class="geo-cell geo-yellow"><span class="geo-square"></span></div>
-        <div class="geo-cell geo-blue"><span class="geo-circle"></span></div>
-        <div class="geo-cell geo-black"><span class="geo-square is-black"></span></div>
+        <div class="geo-cell geo-paper"><span class="geo-circle"></span></div>
+        <div class="geo-cell geo-green"><span class="geo-square"></span></div>
       </div>
     </section>
   {% else %}
     <section class="profile-hero">
       <div class="profile-copy">
-        <p class="eyebrow">Streak</p>
-        <h1 class="streak-number">{{ session_streak }}</h1>
-        <p class="profile-id">{{ user_name if user_name else user_id }}</p>
-        <div class="hero-actions">
-          <a class="button button--red button--full" href="{{ url_for('checkin') }}">Punch</a>
-          <a class="button button--paper button--full" href="{{ url_for('home') }}">Rooms</a>
+        <div class="profile-heading">
+          <a class="profile-avatar" href="{{ url_for('profile_emoji') }}" aria-label="Change profile emoji">{{ user_emoji }}</a>
+          <div>
+            <p class="eyebrow">Streak</p>
+            <h1 class="streak-number">{{ session_streak }}</h1>
+            <p class="profile-id">{{ user_name if user_name else user_id }}</p>
+          </div>
         </div>
+        <p class="profile-context">Current session streak. Your recent check-ins and next room picks are below.</p>
       </div>
 
       <div class="profile-geometry" aria-hidden="true">
         <div class="geo-cell geo-yellow"><span class="geo-square"></span></div>
-        <div class="geo-cell geo-red"><span class="geo-circle is-black"></span></div>
+        <div class="geo-cell geo-blue"><span class="geo-circle is-black"></span></div>
         <div class="geo-cell geo-paper"><span class="geo-circle"></span></div>
-        <div class="geo-cell geo-black"><span class="geo-square is-black"></span></div>
+        <div class="geo-cell geo-green"><span class="geo-square"></span></div>
       </div>
     </section>
 

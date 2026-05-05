@@ -13,10 +13,19 @@ USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 SCOPES = "openid email profile"
 DEFAULT_REDIRECT_URI = "http://localhost:3000/session/oauth/callback"
 OAUTH_STATE_LIMIT = 8
+DEFAULT_USER_EMOJI = "\U0001F642"
+EMOJI_MAX_LENGTH = 16
 
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "wireframe-dev-secret")
+
+
+@app.context_processor
+def inject_shell_state():
+    return {
+        "user_emoji": _signed_in_emoji(),
+    }
 
 
 class OAuthConfigError(RuntimeError):
@@ -179,6 +188,44 @@ def _safe_json_post(url, payload):
         return None, None, str(exc)
 
 
+def _safe_json_put(url, payload):
+    fallback_url = _fallback_url(url)
+    data = __import__("json").dumps(payload).encode("utf-8")
+    req = request.Request(
+        url,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="PUT",
+    )
+    try:
+        with request.urlopen(req, timeout=4) as response:
+            body = response.read().decode("utf-8")
+            return response.getcode(), __import__("json").loads(body), None
+    except error.HTTPError as exc:
+        detail = exc.read().decode("utf-8") if exc.fp else ""
+        return exc.code, None, detail or str(exc)
+    except error.URLError as exc:
+        if fallback_url:
+            fallback_req = request.Request(
+                fallback_url,
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="PUT",
+            )
+            try:
+                with request.urlopen(fallback_req, timeout=4) as response:
+                    body = response.read().decode("utf-8")
+                    return response.getcode(), __import__("json").loads(body), None
+            except error.HTTPError as fallback_exc:
+                detail = (
+                    fallback_exc.read().decode("utf-8") if fallback_exc.fp else ""
+                )
+                return fallback_exc.code, None, detail or str(fallback_exc)
+            except Exception:
+                pass
+        return None, None, str(exc)
+
+
 def _fallback_url(url):
     if "checkin-service:5000" in url:
         return url.replace("checkin-service:5000", "localhost:5000")
@@ -197,6 +244,30 @@ def _signed_in_user():
 
 def _signed_in_name():
     return session.get("user_name")
+
+
+def _signed_in_emoji():
+    emoji = session.get("user_emoji")
+    if _clean_emoji(emoji):
+        return emoji
+    return DEFAULT_USER_EMOJI
+
+
+def _clean_emoji(value):
+    if not isinstance(value, str):
+        return None
+    emoji = value.strip()
+    if not emoji or len(emoji) > EMOJI_MAX_LENGTH:
+        return None
+    return emoji
+
+
+def _user_profile(user_id):
+    encoded_user_id = parse.quote(str(user_id), safe="")
+    ok, data, err = _safe_json_get(f"{CHECKIN_SERVICE_URL}/api/users/{encoded_user_id}")
+    if not ok:
+        return None, err
+    return data.get("user", {}), None
 
 
 def _room_options():
@@ -298,7 +369,18 @@ def session_oauth_callback():
     session["user_id"] = user_id
     session["user_email"] = email
     session["user_name"] = result.get("name") or email or user_id
+    session.setdefault("user_emoji", DEFAULT_USER_EMOJI)
     session.setdefault("session_streak", 0)
+    status_code, response_data, _ = _safe_json_post(
+        f"{CHECKIN_SERVICE_URL}/api/users",
+        {
+            "user_id": user_id,
+            "username": session["user_name"],
+            "email": email,
+        },
+    )
+    if status_code in (200, 201) and response_data and response_data.get("user"):
+        session["user_emoji"] = response_data["user"].get("emoji", DEFAULT_USER_EMOJI)
     flash("Signed in.")
     return redirect(url_for("home"))
 
@@ -436,9 +518,27 @@ def checkin_step3():
         session["last_checkin"] = response_data.get("checkin", payload)
         session["session_streak"] = int(session.get("session_streak", 0)) + 1
         session.pop("pending_checkin", None)
-        return redirect(url_for("checkin_hook"))
+        return redirect(url_for("checkin_extra_prompt"))
 
     return render_template("checkin_step3_quiet.html", user_id=_signed_in_user())
+
+
+@app.route("/checkin/extra", methods=["GET", "POST"])
+def checkin_extra_prompt():
+    gate = _require_signin()
+    if gate:
+        return gate
+
+    if not session.get("last_checkin"):
+        flash("Complete a check-in first.")
+        return redirect(url_for("checkin_step1"))
+
+    if flask_request.method == "POST":
+        if flask_request.form.get("answer_more") == "1":
+            return redirect(url_for("checkin_step4_optional_temperature"))
+        return redirect(url_for("checkin_hook"))
+
+    return render_template("checkin_extra_prompt.html", user_id=_signed_in_user())
 
 
 @app.route("/checkin/hook")
@@ -474,7 +574,7 @@ def checkin_step4_optional_temperature():
 
     if flask_request.method == "POST":
         if flask_request.form.get("skip") == "1":
-            return redirect(url_for("profile"))
+            return redirect(url_for("checkin_hook"))
 
         temp_value = flask_request.form.get("temperature", "").strip()
         optional_feedback = session.get("optional_feedback", {})
@@ -497,7 +597,7 @@ def checkin_step5_optional_outlets():
 
     if flask_request.method == "POST":
         if flask_request.form.get("skip") == "1":
-            return redirect(url_for("profile"))
+            return redirect(url_for("checkin_hook"))
 
         outlet_value = flask_request.form.get("outlets", "").strip()
         optional_feedback = session.get("optional_feedback", {})
@@ -506,9 +606,45 @@ def checkin_step5_optional_outlets():
 
         # TODO: Persist optional Phase 3 upsell fields once backend schema supports them.
         flash("Details saved.")
-        return redirect(url_for("profile"))
+        return redirect(url_for("checkin_hook"))
 
     return render_template("checkin_step5_outlets.html", user_id=_signed_in_user())
+
+
+@app.route("/profile/emoji", methods=["GET", "POST"])
+def profile_emoji():
+    user_id = _signed_in_user()
+    if not user_id:
+        flash("Sign in before choosing an emoji.")
+        return redirect(url_for("profile"))
+
+    if flask_request.method == "POST":
+        emoji = _clean_emoji(flask_request.form.get("emoji", ""))
+        if not emoji:
+            flash("Choose an emoji from the picker.")
+            return redirect(url_for("profile_emoji"))
+
+        session["user_emoji"] = emoji
+        encoded_user_id = parse.quote(str(user_id), safe="")
+        status_code, response_data, error_text = _safe_json_put(
+            f"{CHECKIN_SERVICE_URL}/api/users/{encoded_user_id}/emoji",
+            {"emoji": emoji},
+        )
+        if status_code not in (200, 201):
+            flash("Emoji saved on this device. We could not reach the profile service.")
+            if error_text:
+                flash(f"Details: {error_text}")
+        elif response_data and response_data.get("user"):
+            session["user_emoji"] = response_data["user"].get("emoji", emoji)
+
+        return redirect(url_for("profile"))
+
+    return render_template(
+        "emoji_picker.html",
+        user_id=user_id,
+        user_name=_signed_in_name(),
+        current_emoji=_signed_in_emoji(),
+    )
 
 
 @app.route("/profile")
@@ -527,11 +663,16 @@ def profile():
         )
     checkins, checkins_error = _recent_user_checkins(user_id)
     recommendations, recs_error = _recommendations(top=3)
+    profile_data, profile_error = _user_profile(user_id)
 
     if checkins_error:
         flash("Unable to load personal history right now.")
     if recs_error:
         flash("Unable to load recommendations right now.")
+    if profile_data and _clean_emoji(profile_data.get("emoji")):
+        session["user_emoji"] = profile_data["emoji"].strip()
+    elif profile_error:
+        session.setdefault("user_emoji", DEFAULT_USER_EMOJI)
 
     # TODO: Replace session-only streak with a persistent backend user streak.
     session_streak = int(session.get("session_streak", 0))

@@ -15,20 +15,20 @@
 
       <div class="step-actions">
         <form method="get" action="{{ url_for('checkin_step4_optional_temperature') }}">
-          <button class="button--yellow button--full" type="submit">Add Detail</button>
+          <button class="button--paper button--full" type="submit">Add room details</button>
         </form>
 
         <form method="get" action="{{ url_for('profile') }}">
-          <button class="button--black button--full" type="submit">Finish</button>
+          <button class="button--success button--full" type="submit">Done</button>
         </form>
       </div>
     </div>
 
     <div class="hook-geometry" aria-hidden="true">
-      <div class="geo-cell geo-yellow"><span class="geo-circle"></span></div>
+      <div class="geo-cell geo-green"><span class="geo-circle"></span></div>
       <div class="geo-cell geo-paper"><span class="geo-square"></span></div>
       <div class="geo-cell geo-black"><span class="geo-square is-black"></span></div>
-      <div class="geo-cell geo-blue"><span class="geo-circle is-black"></span></div>
+      <div class="geo-cell geo-yellow"><span class="geo-circle is-black"></span></div>
     </div>
   </section>
 {% endblock %}

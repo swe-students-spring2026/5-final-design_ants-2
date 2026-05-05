@@ -9,15 +9,15 @@
         {% if user_id %}
           <p class="subline">Signed in as {{ user_name if user_name else user_id }}.</p>
           <div class="hero-actions">
-            <a class="button button--red button--full" href="{{ url_for('checkin') }}">Start</a>
-            <a class="button button--blue button--full" href="{{ url_for('profile') }}">Streak</a>
+            <a class="button button--primary button--full" href="{{ url_for('checkin') }}">Punch in</a>
+            <a class="button button--paper button--full" href="{{ url_for('profile') }}">View streak</a>
           </div>
         {% else %}
           <p class="subline">Sign in with Google. Punch in fast.</p>
           <div class="hero-actions">
-            <a class="button button--blue button--full" href="{{ url_for('session_login') }}">Google</a>
+            <a class="button button--primary button--full" href="{{ url_for('session_login') }}">Google sign in</a>
             {% if not oauth_ready %}
-              <a class="button button--yellow button--full" href="{{ url_for('profile') }}">Setup</a>
+              <a class="button button--warning button--full" href="{{ url_for('profile') }}">OAuth setup</a>
             {% endif %}
           </div>
         {% endif %}
@@ -40,7 +40,9 @@
       <div class="data-grid">
         {% for room in rooms[:6] %}
           <article class="data-tile">
-            <p class="kicker">{{ room._id }}</p>
+            {% if room.name and room.name != room._id %}
+              <p class="kicker">{{ room._id }}</p>
+            {% endif %}
             <h3>{{ room.name if room.name else room._id }}</h3>
             <div class="metric-row">
               <span class="metric">Crowd<strong>{{ room.current_crowd if room.current_crowd is not none else "n/a" }}</strong></span>

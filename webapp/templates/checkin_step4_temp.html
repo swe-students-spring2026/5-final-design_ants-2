@@ -5,20 +5,20 @@
     <div class="flow-copy">
       <div class="step-meta">
         <span class="step-chip">+</span>
-        <p class="eyebrow">Optional / 1 of 2</p>
+        <p class="eyebrow">Optional detail 1 of 2</p>
       </div>
-      <h1 class="step-title">Temp</h1>
+      <h1 class="step-title">Temperature</h1>
 
       <form class="choice-grid" method="post" action="{{ url_for('checkin_step4_optional_temperature') }}">
         <button class="choice-button button--blue" type="submit" name="temperature" value="cold"><strong>Cold</strong></button>
-        <button class="choice-button button--yellow" type="submit" name="temperature" value="comfortable"><strong>Good</strong></button>
-        <button class="choice-button button--red" type="submit" name="temperature" value="warm"><strong>Warm</strong></button>
+        <button class="choice-button button--success" type="submit" name="temperature" value="comfortable"><strong>Comfortable</strong></button>
+        <button class="choice-button button--warning" type="submit" name="temperature" value="warm"><strong>Warm</strong></button>
       </form>
 
       <div class="step-actions">
         <form method="post" action="{{ url_for('checkin_step4_optional_temperature') }}">
           <input type="hidden" name="skip" value="1">
-          <button class="button--black button--full" type="submit">Skip</button>
+          <button class="button--paper button--full" type="submit">Skip</button>
         </form>
       </div>
     </div>

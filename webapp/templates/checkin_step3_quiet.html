@@ -5,16 +5,16 @@
     <div class="flow-copy">
       <div class="step-meta">
         <span class="step-chip">03</span>
-        <p class="eyebrow">Required / Quiet</p>
+        <p class="eyebrow">Step 3 of 3</p>
       </div>
-      <h1 class="step-title">Quiet</h1>
+      <h1 class="step-title">How quiet?</h1>
 
       <form class="rating-grid" method="post" action="{{ url_for('checkin_step3') }}">
-        <button class="rating-button button--red" type="submit" name="quietness" value="1"><strong>1</strong><small>Loud</small></button>
+        <button class="rating-button button--danger" type="submit" name="quietness" value="1"><strong>1</strong><small>Loud</small></button>
         <button class="rating-button" type="submit" name="quietness" value="2"><strong>2</strong><small>Noise</small></button>
         <button class="rating-button" type="submit" name="quietness" value="3"><strong>3</strong><small>Mid</small></button>
         <button class="rating-button" type="submit" name="quietness" value="4"><strong>4</strong><small>Quiet</small></button>
-        <button class="rating-button button--blue" type="submit" name="quietness" value="5"><strong>5</strong><small>Silent</small></button>
+        <button class="rating-button button--primary" type="submit" name="quietness" value="5"><strong>5</strong><small>Silent</small></button>
       </form>
     </div>
 

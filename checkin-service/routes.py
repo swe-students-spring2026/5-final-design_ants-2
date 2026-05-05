@@ -1,8 +1,35 @@
 from flask import Blueprint, request, jsonify, render_template
 from datetime import datetime
-from db.db import checkins as checkins_collection, rooms as rooms_collection
+from db.db import checkins as checkins_collection, rooms as rooms_collection, users as users_collection
+from db.schemas import DEFAULT_USER_EMOJI
 
 bp = Blueprint("main", __name__)
+EMOJI_MAX_LENGTH = 16
+
+
+def _serialize_user(user):
+    if not user:
+        return None
+    created_at = user.get("created_at")
+    if hasattr(created_at, "isoformat"):
+        created_at = created_at.isoformat()
+    return {
+        "_id": str(user["_id"]),
+        "username": user.get("username") or str(user["_id"]),
+        "email": user.get("email") or "",
+        "emoji": user.get("emoji") or DEFAULT_USER_EMOJI,
+        "created_at": created_at,
+        "credits": user.get("credits", 0),
+    }
+
+
+def _clean_emoji(value):
+    if not isinstance(value, str):
+        return None
+    emoji = value.strip()
+    if not emoji or len(emoji) > EMOJI_MAX_LENGTH:
+        return None
+    return emoji
 
 
 @bp.route("/")
@@ -34,6 +61,87 @@ def get_rooms():
         room["_id"] = str(room["_id"])
 
     return jsonify(rooms), 200
+
+
+@bp.route("/api/users", methods=["POST"])
+def upsert_user():
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    user_id = str(data.get("user_id", "")).strip()
+    if not user_id:
+        return jsonify({"error": "Missing field: user_id"}), 400
+
+    existing = users_collection.find_one({"_id": user_id})
+    now = datetime.utcnow()
+    username = str(data.get("username") or user_id).strip()
+    email = str(data.get("email") or "").strip()
+    update = {
+        "$set": {
+            "username": username or user_id,
+            "email": email,
+        },
+        "$setOnInsert": {
+            "created_at": now,
+            "credits": 0,
+            "emoji": DEFAULT_USER_EMOJI,
+        },
+    }
+
+    if "emoji" in data:
+        emoji = _clean_emoji(data.get("emoji"))
+        if not emoji:
+            return jsonify({"error": "Invalid emoji"}), 400
+        update["$set"]["emoji"] = emoji
+        update["$setOnInsert"].pop("emoji", None)
+
+    users_collection.update_one({"_id": user_id}, update, upsert=True)
+    user = users_collection.find_one({"_id": user_id})
+    return jsonify({"user": _serialize_user(user)}), 200 if existing else 201
+
+
+@bp.route("/api/users/<path:user_id>", methods=["GET"])
+def get_user(user_id):
+    user = users_collection.find_one({"_id": user_id})
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if "emoji" not in user:
+        users_collection.update_one(
+            {"_id": user_id},
+            {"$set": {"emoji": DEFAULT_USER_EMOJI}},
+        )
+        user["emoji"] = DEFAULT_USER_EMOJI
+    return jsonify({"user": _serialize_user(user)}), 200
+
+
+@bp.route("/api/users/<path:user_id>/emoji", methods=["PUT"])
+def update_user_emoji(user_id):
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    emoji = _clean_emoji(data.get("emoji"))
+    if not emoji:
+        return jsonify({"error": "Invalid emoji"}), 400
+
+    now = datetime.utcnow()
+    users_collection.update_one(
+        {"_id": user_id},
+        {
+            "$set": {"emoji": emoji},
+            "$setOnInsert": {
+                "username": user_id,
+                "email": user_id,
+                "created_at": now,
+                "credits": 0,
+            },
+        },
+        upsert=True,
+    )
+    user = users_collection.find_one({"_id": user_id})
+    return jsonify({"user": _serialize_user(user)}), 200
 
 
 @bp.route("/api/checkins", methods=["POST"])
