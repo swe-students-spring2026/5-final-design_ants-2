@@ -1,17 +1,12 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <section class="hook-shell">
-    <div class="hook-copy">
-      <p class="eyebrow">Logged</p>
-      <h1 class="impact-number">+{{ impact_number }}</h1>
-      <p class="impact-label">Students helped</p>
-
-      <div class="summary-list">
-        <div class="summary-item"><span>Room</span><strong>{{ checkin_data.room_id }}</strong></div>
-        <div class="summary-item"><span>Crowd</span><strong>{{ checkin_data.crowdedness }}</strong></div>
-        <div class="summary-item"><span>Quiet</span><strong>{{ checkin_data.quietness }}</strong></div>
-      </div>
+  <section class="hook-shell hook-shell--plain">
+    <div class="hook-copy hook-copy--plain">
+      <p class="mini-counter" aria-label="Total punches">
+        <span data-count-to="{{ punch_count }}">0</span>
+      </p>
+      <h1 class="step-title">You've punched in!</h1>
 
       <div class="step-actions">
         <form method="get" action="{{ url_for('checkin_step4_optional_temperature') }}">
@@ -23,12 +18,33 @@
         </form>
       </div>
     </div>
-
-    <div class="hook-geometry" aria-hidden="true">
-      <div class="geo-cell geo-green"><span class="geo-circle"></span></div>
-      <div class="geo-cell geo-paper"><span class="geo-square"></span></div>
-      <div class="geo-cell geo-black"><span class="geo-square is-black"></span></div>
-      <div class="geo-cell geo-yellow"><span class="geo-circle is-black"></span></div>
-    </div>
   </section>
+
+  <script>
+    (() => {
+      const counter = document.querySelector("[data-count-to]");
+      if (!counter) return;
+
+      const target = Number(counter.dataset.countTo || 0);
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (!target || reduceMotion) {
+        counter.textContent = String(target);
+        return;
+      }
+
+      const duration = 700;
+      const start = performance.now();
+
+      function tick(now) {
+        const progress = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        counter.textContent = String(Math.round(eased * target));
+        if (progress < 1) {
+          window.requestAnimationFrame(tick);
+        }
+      }
+
+      window.requestAnimationFrame(tick);
+    })();
+  </script>
 {% endblock %}

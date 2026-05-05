@@ -16,6 +16,7 @@ DEFAULT_REDIRECT_URI = "http://localhost:3000/session/oauth/callback"
 OAUTH_STATE_LIMIT = 8
 DEFAULT_USER_EMOJI = "\U0001F642"
 EMOJI_MAX_LENGTH = 16
+CHECKIN_COOLDOWN_SECONDS = 30 * 60
 DEBUG_ROOMS = [
     {"_id": "debug_ll2", "name": "Bobst LL2", "current_crowd": 5, "current_quiet": 4},
     {"_id": "debug_ll1", "name": "Bobst LL1", "current_crowd": 3, "current_quiet": 3},
@@ -376,12 +377,85 @@ def _checkin_datetime(value):
 
 
 def _checked_in_today(checkins):
+    return _latest_checkin_today(checkins) is not None
+
+
+def _latest_checkin(checkins):
+    latest = None
+    latest_time = None
+    for checkin in checkins:
+        checkin_time = _checkin_datetime(checkin.get("time"))
+        if checkin_time and (latest_time is None or checkin_time > latest_time):
+            latest = checkin
+            latest_time = checkin_time
+    return latest, latest_time
+
+
+def _latest_checkin_today(checkins):
     today = datetime.now(USER_TIMEZONE).date()
+    latest = None
+    latest_time = None
     for checkin in checkins:
         checkin_time = _checkin_datetime(checkin.get("time"))
         if checkin_time and checkin_time.date() == today:
-            return True
-    return False
+            if latest_time is None or checkin_time > latest_time:
+                latest = checkin
+                latest_time = checkin_time
+    return latest
+
+
+def _cooldown_minutes(remaining_seconds):
+    return max(1, int((remaining_seconds + 59) // 60))
+
+
+def _checkin_cooldown_state(checkins):
+    latest, latest_time = _latest_checkin(checkins)
+    if not latest_time:
+        return {
+            "active": False,
+            "remaining_seconds": 0,
+            "remaining_minutes": 0,
+            "last_checkin": latest,
+        }
+
+    elapsed = datetime.now(USER_TIMEZONE) - latest_time
+    remaining = CHECKIN_COOLDOWN_SECONDS - int(elapsed.total_seconds())
+    if remaining <= 0:
+        return {
+            "active": False,
+            "remaining_seconds": 0,
+            "remaining_minutes": 0,
+            "last_checkin": latest,
+        }
+
+    return {
+        "active": True,
+        "remaining_seconds": remaining,
+        "remaining_minutes": _cooldown_minutes(remaining),
+        "last_checkin": latest,
+    }
+
+
+def _debug_bypass_cooldown_enabled():
+    return bool(session.get("debug_bypass_checkin_cooldown"))
+
+
+def _room_display_name(room_id, rooms):
+    room_id = str(room_id or "")
+    for room in rooms:
+        if str(room.get("_id", "")) == room_id:
+            return room.get("name") or "Study room"
+    return "Study room"
+
+
+def _decorate_checkins(checkins, rooms):
+    return [
+        {
+            **checkin,
+            "room_name": _room_display_name(checkin.get("room_id"), rooms),
+        }
+        for checkin in checkins
+    ]
 
 
 def _require_signin():
@@ -399,9 +473,16 @@ def home():
         flash("Unable to fetch live room data from checkin-service.")
 
     has_checked_in_today = False
+    cooldown_state = {
+        "active": False,
+        "remaining_seconds": 0,
+        "remaining_minutes": 0,
+        "last_checkin": None,
+    }
     if user_id:
         checkins, _ = _recent_user_checkins(user_id)
         has_checked_in_today = _checked_in_today(checkins)
+        cooldown_state = _checkin_cooldown_state(checkins)
 
     return render_template(
         "home.html",
@@ -410,11 +491,13 @@ def home():
         oauth_ready=_oauth_is_configured(),
         rooms=rooms,
         has_checked_in_today=has_checked_in_today,
+        cooldown_active=cooldown_state["active"],
+        cooldown_minutes=cooldown_state["remaining_minutes"],
         current_year=datetime.utcnow().year,
     )
 
 
-def _debug_home(has_checked_in_today):
+def _debug_home(has_checked_in_today, cooldown_active=False, cooldown_minutes=0):
     return render_template(
         "home.html",
         user_id="debug@nyu.edu",
@@ -422,6 +505,8 @@ def _debug_home(has_checked_in_today):
         oauth_ready=True,
         rooms=DEBUG_ROOMS,
         has_checked_in_today=has_checked_in_today,
+        cooldown_active=cooldown_active,
+        cooldown_minutes=cooldown_minutes,
         current_year=datetime.utcnow().year,
     )
 
@@ -434,6 +519,25 @@ def debug_home_cta():
 @app.route("/debug/home/done")
 def debug_home_done():
     return _debug_home(has_checked_in_today=True)
+
+
+@app.route("/debug/home/cooldown")
+def debug_home_cooldown():
+    return _debug_home(
+        has_checked_in_today=True,
+        cooldown_active=True,
+        cooldown_minutes=30,
+    )
+
+
+@app.route("/debug/checkin/bypass-cooldown")
+def debug_checkin_bypass_cooldown():
+    gate = _require_signin()
+    if gate:
+        return gate
+    session["debug_bypass_checkin_cooldown"] = True
+    flash("Debug cooldown bypass enabled for this punch.")
+    return redirect(url_for("checkin_step1"))
 
 
 @app.route("/session/login", methods=["GET", "POST"])
@@ -514,6 +618,8 @@ def checkin():
             "crowdedness": flask_request.form.get("crowdedness"),
             "quietness": flask_request.form.get("quietness"),
         }
+        if _debug_bypass_cooldown_enabled() or flask_request.form.get("debug_bypass_cooldown") == "1":
+            payload["debug_bypass_cooldown"] = True
         try:
             response = requests.post(
                 f"{CHECKIN_SERVICE_URL}/api/checkins",
@@ -534,6 +640,13 @@ def checkin():
     gate = _require_signin()
     if gate:
         return gate
+    checkins, _ = _recent_user_checkins(_signed_in_user())
+    cooldown_state = _checkin_cooldown_state(checkins)
+    if cooldown_state["active"] and not _debug_bypass_cooldown_enabled():
+        flash(
+            f"Punch cooldown active. Try again in {cooldown_state['remaining_minutes']} minutes."
+        )
+        return redirect(url_for("home"))
     return redirect(url_for("checkin_step1"))
 
 
@@ -549,13 +662,32 @@ def checkin_step1():
         flash("Unable to fetch room options right now.")
 
     recent_checkins, _ = _recent_user_checkins(user_id)
-    smart_default_room = recent_checkins[0].get("room_id") if recent_checkins else None
+    cooldown_state = _checkin_cooldown_state(recent_checkins)
+    if cooldown_state["active"] and not _debug_bypass_cooldown_enabled():
+        flash(
+            f"Punch cooldown active. Try again in {cooldown_state['remaining_minutes']} minutes."
+        )
+        return redirect(url_for("home"))
+
+    has_checked_in_today = _checked_in_today(recent_checkins)
 
     if flask_request.method == "POST":
         chosen_room = flask_request.form.get("room_id", "").strip()
         if not chosen_room:
             flash("Pick a location to continue.")
             return redirect(url_for("checkin_step1"))
+
+        if has_checked_in_today and flask_request.form.get("confirm_repeat") != "1":
+            repeat_room = _room_display_name(chosen_room, rooms)
+            return render_template(
+                "checkin_step1_location.html",
+                user_id=user_id,
+                rooms=rooms,
+                repeat_room_id=chosen_room,
+                repeat_message=(
+                    f"Are you sure you returned to {repeat_room} and want to punch in again?"
+                ),
+            )
 
         session["pending_checkin"] = {"room_id": chosen_room}
         return redirect(url_for("checkin_step2"))
@@ -564,7 +696,8 @@ def checkin_step1():
         "checkin_step1_location.html",
         user_id=user_id,
         rooms=rooms,
-        smart_default_room=smart_default_room,
+        repeat_room_id=None,
+        repeat_message=None,
     )
 
 
@@ -619,10 +752,15 @@ def checkin_step3():
             "crowdedness": pending["crowdedness"],
             "quietness": quietness,
         }
+        if _debug_bypass_cooldown_enabled():
+            payload["debug_bypass_cooldown"] = True
         status_code, response_data, error_text = _safe_json_post(
             f"{CHECKIN_SERVICE_URL}/api/checkins", payload
         )
         if status_code != 201:
+            if status_code == 429:
+                flash("Punch cooldown active. Try again in 30 minutes.")
+                return redirect(url_for("home"))
             flash("Mandatory check-in submission failed. Please retry.")
             if error_text:
                 flash(f"Details: {error_text}")
@@ -630,6 +768,7 @@ def checkin_step3():
 
         session["last_checkin"] = response_data.get("checkin", payload)
         session["session_streak"] = int(session.get("session_streak", 0)) + 1
+        session.pop("debug_bypass_checkin_cooldown", None)
         session.pop("pending_checkin", None)
         return redirect(url_for("checkin_extra_prompt"))
 
@@ -665,13 +804,12 @@ def checkin_hook():
         flash("No recent check-in found.")
         return redirect(url_for("checkin_step1"))
 
-    # TODO: Replace this mocked impact number with analytics-driven impact metrics.
-    impact_number = 142
+    checkins, _ = _recent_user_checkins(_signed_in_user())
+    punch_count = len(checkins) or max(1, int(session.get("session_streak", 0)))
     return render_template(
         "checkin_hook.html",
         user_id=_signed_in_user(),
-        checkin_data=checkin_data,
-        impact_number=impact_number,
+        punch_count=punch_count,
     )
 
 
@@ -775,11 +913,14 @@ def profile():
             optional_feedback={},
         )
     checkins, checkins_error = _recent_user_checkins(user_id)
+    rooms, rooms_error = _room_options()
     recommendations, recs_error = _recommendations(top=3)
     profile_data, profile_error = _user_profile(user_id)
 
     if checkins_error:
         flash("Unable to load personal history right now.")
+    if rooms_error:
+        flash("Unable to load room names right now.")
     if recs_error:
         flash("Unable to load recommendations right now.")
     if profile_data and _clean_emoji(profile_data.get("emoji")):
@@ -795,7 +936,7 @@ def profile():
         user_id=user_id,
         user_name=_signed_in_name(),
         oauth_ready=_oauth_is_configured(),
-        checkins=checkins,
+        checkins=_decorate_checkins(checkins, rooms),
         recommendations=recommendations,
         session_streak=session_streak,
         optional_feedback=session.get("optional_feedback", {}),

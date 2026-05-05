@@ -2,18 +2,30 @@
 
 {% block content %}
   <div class="page-grid page-grid--home">
-    {% if not user_id or not has_checked_in_today %}
-      <section class="home-action" aria-label="Punch in">
+    <section class="home-action" aria-label="Punch in">
+      {% if user_id and has_checked_in_today %}
+        <div class="punch-card punch-card--disabled" aria-disabled="true">
+          <span class="punch-card__avatar" aria-hidden="true">{{ user_emoji }}</span>
+          <span class="punch-card__copy">
+            <strong>You've Punched In Today! </strong>
+            <small>You are really locked in. </small>
+          </span>
+        </div>
+      {% else %}
         <a class="punch-card" href="{{ url_for('checkin') if user_id else url_for('session_login') }}">
           <span class="punch-card__avatar" aria-hidden="true">{{ user_emoji if user_id else "L" }}</span>
           <span class="punch-card__copy">
-            <strong>{{ "Punch in" if user_id else "Sign in to punch in" }}</strong>
-            <small>{{ "You haven't punched in today! " if user_id else "Use your NYU account, then log a room" }}</small>
+            <strong>
+              {% if not user_id %}Sign in to punch in{% elif has_checked_in_today %}Punch in again{% else %}Punch in{% endif %}
+            </strong>
+            <small>
+              {% if not user_id %}Use your NYU account, then log a room{% elif has_checked_in_today %}Ready for another room check.{% else %}You haven't punched in today!{% endif %}
+            </small>
           </span>
           <span class="punch-card__go" aria-hidden="true">Go</span>
         </a>
-      </section>
-    {% endif %}
+      {% endif %}
+    </section>
 
     <section class="data-section room-section" aria-labelledby="rooms-title">
       <div class="section-title section-title--plain">

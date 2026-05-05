@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime, timedelta
 from app import create_app
 from db.db import checkins as checkins_collection, rooms as rooms_collection, users as users_collection
 
@@ -81,6 +82,43 @@ def test_create_checkin_success(client):
     assert "time" in data["checkin"]
 
 
+def test_create_checkin_cooldown_blocks_repeat(client):
+    payload = {
+        "user_id": "zelu",
+        "room_id": "bobst_3",
+        "crowdedness": 4,
+        "quietness": 2
+    }
+
+    first_response = client.post("/api/checkins", json=payload)
+    second_response = client.post("/api/checkins", json={**payload, "room_id": "bobst_4"})
+
+    assert first_response.status_code == 201
+    assert second_response.status_code == 429
+    data = second_response.get_json()
+    assert data["error"] == "Punch cooldown active"
+    assert data["retry_after_seconds"] > 0
+
+
+def test_create_checkin_debug_bypass_skips_cooldown(client):
+    payload = {
+        "user_id": "zelu",
+        "room_id": "bobst_3",
+        "crowdedness": 4,
+        "quietness": 2
+    }
+
+    first_response = client.post("/api/checkins", json=payload)
+    second_response = client.post(
+        "/api/checkins",
+        json={**payload, "room_id": "bobst_4", "debug_bypass_cooldown": True},
+    )
+
+    assert first_response.status_code == 201
+    assert second_response.status_code == 201
+    assert second_response.get_json()["checkin"]["room_id"] == "bobst_4"
+
+
 def test_create_checkin_missing_field(client):
     payload = {
         "user_id": "zelu",
@@ -148,6 +186,10 @@ def test_get_user_checkins(client):
     }
 
     client.post("/api/checkins", json=payload1)
+    checkins_collection.update_one(
+        {"user_id": "zelu", "room_id": "bobst_2"},
+        {"$set": {"time": (datetime.utcnow() - timedelta(minutes=31)).isoformat()}},
+    )
     client.post("/api/checkins", json=payload2)
 
     response = client.get("/api/checkins/zelu")
