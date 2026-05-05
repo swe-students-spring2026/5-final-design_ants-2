@@ -4,7 +4,7 @@ services:
     ports:
       - "27019:27017"
     volumes:
-      - ./mongodb:/data/db
+      - ${MONGO_DATA_DIR:-./mongodb}:/data/db
     healthcheck:
       test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok' | grep -q 1"]
       interval: 10s
