@@ -1,4 +1,4 @@
-# Library Crowdedness — NYU Bobst
+# Lockin
 
 [![release](https://img.shields.io/github/v/release/swe-students-spring2026/5-final-design_ants-2)](https://github.com/swe-students-spring2026/5-final-design_ants-2/releases)
 [![checkin-service](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/checkin-service.yml/badge.svg)](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/checkin-service.yml)
@@ -8,7 +8,7 @@
 [![CD (dev)](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/deploy.yml/badge.svg?branch=dev)](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/deploy.yml?query=branch%3Adev)
 [![CD (prod)](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/deploy.yml/badge.svg?branch=prod)](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/deploy.yml?query=branch%3Aprod)
 
-A web app for finding the best place to study in NYU's Bobst library. Students report how crowded and quiet each floor is, and the system blends those live reports with historical patterns to rank rooms by "study-ability".
+A web app for finding the best place to study on the campus. Students report how crowded and quiet each floor is, and the system blends those live reports with historical patterns to rank rooms by "study-ability".
 
 ## Team
 
