@@ -16,7 +16,7 @@ def test_index_success(client):
         response = client.get('/')
         assert response.status_code == 200
         assert b'u1' not in response.data
-        assert b'Google' in response.data
+        assert b'Sign in to punch in' in response.data
 
 def test_index_api_error(client):
     with requests_mock.Mocker() as m:
@@ -24,6 +24,25 @@ def test_index_api_error(client):
         m.get('http://recommendation-service:8000/api/recommend?top=5', status_code=500)
         response = client.get('/')
         assert response.status_code == 200
+
+
+def test_debug_home_cta_visible(client):
+    response = client.get('/debug/home/cta')
+
+    assert response.status_code == 200
+    assert b'Punch in' in response.data
+    assert b'packed' in response.data
+    assert b'quiet' in response.data
+    assert b'debug_ll2' not in response.data
+
+
+def test_debug_home_cta_hidden(client):
+    response = client.get('/debug/home/done')
+
+    assert response.status_code == 200
+    assert b'Punch in' not in response.data
+    assert b'Bobst LL2' in response.data
+    assert b'Bobst 9F' in response.data
 
 def test_checkin_success(client):
     with requests_mock.Mocker() as m:

@@ -1,6 +1,7 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib import error, parse, request
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import requests
 from flask import Flask, flash, redirect, render_template, request as flask_request, session, url_for
@@ -15,6 +16,29 @@ DEFAULT_REDIRECT_URI = "http://localhost:3000/session/oauth/callback"
 OAUTH_STATE_LIMIT = 8
 DEFAULT_USER_EMOJI = "\U0001F642"
 EMOJI_MAX_LENGTH = 16
+DEBUG_ROOMS = [
+    {"_id": "debug_ll2", "name": "Bobst LL2", "current_crowd": 5, "current_quiet": 4},
+    {"_id": "debug_ll1", "name": "Bobst LL1", "current_crowd": 3, "current_quiet": 3},
+    {"_id": "debug_1", "name": "Bobst 1F", "current_crowd": 2, "current_quiet": 5},
+    {"_id": "debug_2", "name": "Bobst 2F", "current_crowd": 4, "current_quiet": 2},
+    {"_id": "debug_3", "name": "Bobst 3F", "current_crowd": 1, "current_quiet": 4},
+    {"_id": "debug_4", "name": "Bobst 4F", "current_crowd": 3, "current_quiet": 5},
+    {"_id": "debug_5", "name": "Bobst 5F", "current_crowd": 5, "current_quiet": 1},
+    {"_id": "debug_6", "name": "Bobst 6F", "current_crowd": 2, "current_quiet": 3},
+    {"_id": "debug_7", "name": "Bobst 7F", "current_crowd": 4, "current_quiet": 4},
+    {"_id": "debug_8", "name": "Bobst 8F", "current_crowd": 1, "current_quiet": 5},
+    {"_id": "debug_9", "name": "Bobst 9F", "current_crowd": None, "current_quiet": None},
+]
+
+
+def _configured_timezone():
+    try:
+        return ZoneInfo(os.getenv("USER_TIMEZONE", "America/New_York"))
+    except ZoneInfoNotFoundError:
+        return timezone.utc
+
+
+USER_TIMEZONE = _configured_timezone()
 
 
 app = Flask(__name__)
@@ -26,6 +50,45 @@ def inject_shell_state():
     return {
         "user_emoji": _signed_in_emoji(),
     }
+
+
+def _rating_value(value):
+    try:
+        rating = int(value)
+    except (TypeError, ValueError):
+        return 0
+    if 1 <= rating <= 5:
+        return rating
+    return 0
+
+
+@app.template_filter("room_level")
+def room_level_filter(value):
+    return _rating_value(value)
+
+
+@app.template_filter("crowd_label")
+def crowd_label_filter(value):
+    return {
+        0: "unknown",
+        1: "open",
+        2: "roomy",
+        3: "steady",
+        4: "crowded",
+        5: "packed",
+    }[_rating_value(value)]
+
+
+@app.template_filter("quiet_label")
+def quiet_label_filter(value):
+    return {
+        0: "unknown",
+        1: "loud",
+        2: "chatty",
+        3: "mixed",
+        4: "quiet",
+        5: "silent",
+    }[_rating_value(value)]
 
 
 class OAuthConfigError(RuntimeError):
@@ -294,6 +357,33 @@ def _recommendations(top=3):
     return data.get("recommendations", []), None
 
 
+def _checkin_datetime(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        checkin_time = value
+    elif isinstance(value, str):
+        try:
+            checkin_time = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    else:
+        return None
+
+    if checkin_time.tzinfo is None:
+        checkin_time = checkin_time.replace(tzinfo=timezone.utc)
+    return checkin_time.astimezone(USER_TIMEZONE)
+
+
+def _checked_in_today(checkins):
+    today = datetime.now(USER_TIMEZONE).date()
+    for checkin in checkins:
+        checkin_time = _checkin_datetime(checkin.get("time"))
+        if checkin_time and checkin_time.date() == today:
+            return True
+    return False
+
+
 def _require_signin():
     if _signed_in_user():
         return None
@@ -308,9 +398,10 @@ def home():
     if rooms_error:
         flash("Unable to fetch live room data from checkin-service.")
 
-    recommendations, recs_error = _recommendations(top=5)
-    if recs_error:
-        flash("Unable to fetch recommendations from recommendation-service.")
+    has_checked_in_today = False
+    if user_id:
+        checkins, _ = _recent_user_checkins(user_id)
+        has_checked_in_today = _checked_in_today(checkins)
 
     return render_template(
         "home.html",
@@ -318,9 +409,31 @@ def home():
         user_name=_signed_in_name(),
         oauth_ready=_oauth_is_configured(),
         rooms=rooms,
-        recommendations=recommendations,
+        has_checked_in_today=has_checked_in_today,
         current_year=datetime.utcnow().year,
     )
+
+
+def _debug_home(has_checked_in_today):
+    return render_template(
+        "home.html",
+        user_id="debug@nyu.edu",
+        user_name="Debug",
+        oauth_ready=True,
+        rooms=DEBUG_ROOMS,
+        has_checked_in_today=has_checked_in_today,
+        current_year=datetime.utcnow().year,
+    )
+
+
+@app.route("/debug/home/cta")
+def debug_home_cta():
+    return _debug_home(has_checked_in_today=False)
+
+
+@app.route("/debug/home/done")
+def debug_home_done():
+    return _debug_home(has_checked_in_today=True)
 
 
 @app.route("/session/login", methods=["GET", "POST"])
