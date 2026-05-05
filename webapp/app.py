@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import requests
 from flask import Flask, flash, redirect, render_template, request as flask_request, session, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 CHECKIN_SERVICE_URL = os.getenv("CHECKIN_API", os.getenv("CHECKIN_SERVICE_URL", "http://checkin-service:5000"))
 RECOMMENDATION_SERVICE_URL = os.getenv("RECOMMENDATION_API", os.getenv("RECOMMENDATION_SERVICE_URL", "http://recommendation-service:8000"))
@@ -45,6 +46,7 @@ USER_TIMEZONE = _configured_timezone()
 
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "wireframe-dev-secret")
 
 
