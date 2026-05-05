@@ -3,36 +3,49 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Lockin Wireframe</title>
+  <title>Lockin</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='lockin.css') }}">
 </head>
-<body>
-  <header>
-    <h1>Lockin</h1>
-    <p>[icon: app] UX Wireframe Mode (No Custom CSS)</p>
-    <nav>
-      <a href="{{ url_for('home') }}">Home</a> |
-      <a href="{{ url_for('checkin') }}">Check In</a> |
-      <a href="{{ url_for('profile') }}">Dashboard</a>
-    </nav>
-    <hr>
-  </header>
+<body class="{% if request.endpoint and request.endpoint.startswith('checkin') %}is-flow{% elif request.endpoint == 'profile_emoji' %}is-picker{% endif %}">
+  <div class="site-shell">
+    <header class="site-header">
+      <div class="top-bar">
+        <a class="brand-sticker" href="{{ url_for('profile_emoji') if user_id else url_for('home') }}" aria-label="{{ 'Change profile emoji' if user_id else 'Lockin home' }}">
+          <span class="brand-mark" aria-hidden="true">{{ user_emoji if user_id else "L" }}</span>
+          <span class="visually-hidden">Lockin</span>
+        </a>
 
-  {% with messages = get_flashed_messages() %}
-    {% if messages %}
-      <section>
-        <h2>System Messages</h2>
-        <ul>
+        <nav class="site-nav" aria-label="Primary navigation">
+          <a href="{{ url_for('home') }}"{% if request.endpoint == 'home' %} class="is-active"{% endif %}>Rooms</a>
+          <a href="{{ url_for('checkin') }}"{% if request.endpoint and request.endpoint.startswith('checkin') %} class="is-active"{% endif %}>Punch</a>
+          <a href="{{ url_for('profile') }}"{% if request.endpoint in ['profile', 'profile_emoji'] %} class="is-active"{% endif %}>Streak</a>
+        </nav>
+
+        <div class="session-panel" aria-label="Session">
+          {% if user_id %}
+            <form method="post" action="{{ url_for('session_logout') }}">
+              <button class="button button--small button--paper" type="submit">Sign out</button>
+            </form>
+          {% else %}
+            <a class="button button--small button--paper" href="{{ url_for('session_login') }}">Sign In</a>
+          {% endif %}
+        </div>
+      </div>
+    </header>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <section class="notice-stack" aria-label="Status messages">
           {% for message in messages %}
-            <li>{{ message }}</li>
+            <p>{{ message }}</p>
           {% endfor %}
-        </ul>
-        <hr>
-      </section>
-    {% endif %}
-  {% endwith %}
+        </section>
+      {% endif %}
+    {% endwith %}
 
-  <main>
-    {% block content %}{% endblock %}
-  </main>
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+  </div>
 </body>
 </html>

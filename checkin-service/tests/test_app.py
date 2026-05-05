@@ -1,12 +1,13 @@
 import pytest
 from app import create_app
-from db.db import checkins as checkins_collection, rooms as rooms_collection
+from db.db import checkins as checkins_collection, rooms as rooms_collection, users as users_collection
 
 
 @pytest.fixture
 def client():
     checkins_collection.delete_many({})
     rooms_collection.delete_many({})
+    users_collection.delete_many({})
 
     app = create_app()
     app.config["TESTING"] = True
@@ -16,6 +17,7 @@ def client():
 
     checkins_collection.delete_many({})
     rooms_collection.delete_many({})
+    users_collection.delete_many({})
 
 
 def test_health(client):
@@ -31,6 +33,32 @@ def test_get_rooms(client):
     assert len(response.json) > 0
     assert "_id" in response.json[0]
     assert "name" in response.json[0]
+
+
+def test_upsert_user_defaults_to_emoji(client):
+    payload = {
+        "user_id": "person@nyu.edu",
+        "username": "Person",
+        "email": "person@nyu.edu",
+    }
+
+    response = client.post("/api/users", json=payload)
+
+    assert response.status_code == 201
+    data = response.get_json()
+    assert data["user"]["_id"] == "person@nyu.edu"
+    assert data["user"]["emoji"]
+
+
+def test_update_user_emoji(client):
+    response = client.put(
+        "/api/users/person@nyu.edu/emoji",
+        json={"emoji": "\U0001F4BF"},
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["user"]["emoji"] == "\U0001F4BF"
 
 
 def test_create_checkin_success(client):

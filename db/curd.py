@@ -4,13 +4,20 @@ from typing import Any, Dict, List, Optional
 from pymongo.database import Database
 
 from .db import users, rooms, checkins
+from .schemas import DEFAULT_USER_EMOJI
 
 LIVE_WINDOW_DEFAULT_MINUTES = 30
 
 
-def create_user(user_id, username, email):
+def create_user(user_id, username, email, emoji=None):
     existing = users.find_one({"_id": user_id})
     if existing:
+        if "emoji" not in existing:
+            users.update_one(
+                {"_id": user_id},
+                {"$set": {"emoji": emoji or DEFAULT_USER_EMOJI}},
+            )
+            existing["emoji"] = emoji or DEFAULT_USER_EMOJI
         return existing
     now = datetime.now(timezone.utc)
 
@@ -18,6 +25,7 @@ def create_user(user_id, username, email):
         "_id": user_id,
         "username": username,
         "email": email,
+        "emoji": emoji or DEFAULT_USER_EMOJI,
         "created_at": now,
         "credits": 0,
     }
@@ -27,6 +35,24 @@ def create_user(user_id, username, email):
 
 def get_user_by_id(user_id):
     return users.find_one({"_id": user_id})
+
+
+def update_user_emoji(user_id, emoji):
+    now = datetime.now(timezone.utc)
+    result = users.update_one(
+        {"_id": user_id},
+        {
+            "$set": {"emoji": emoji},
+            "$setOnInsert": {
+                "username": user_id,
+                "email": user_id,
+                "created_at": now,
+                "credits": 0,
+            },
+        },
+        upsert=True,
+    )
+    return users.find_one({"_id": result.upserted_id or user_id})
 
 def get_all_rooms():
     return list(rooms.find())

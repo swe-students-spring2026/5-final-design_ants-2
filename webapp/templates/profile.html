@@ -2,83 +2,102 @@
 
 {% block content %}
   {% if not user_id %}
-  <section>
-    <h2>[icon: key] Sign In</h2>
-    <p>Sign in once per browser session to check in and track your streak.</p>
-    {% for uid in sample_user_ids %}
-      <form method="post" action="{{ url_for('session_login') }}" style="display:inline">
-        <input type="hidden" name="user_id" value="{{ uid }}">
-        <button type="submit">Sign in as {{ uid }}</button>
-      </form>
-    {% endfor %}
-  </section>
+    <section class="auth-shell">
+      <div class="auth-copy">
+        <p class="eyebrow">Session</p>
+        <h1 class="display">Sign in to punch in.</h1>
+        <p class="subline">Use your NYU Google account to log room check-ins and keep your streak.</p>
+        <div class="hero-actions">
+          <a class="button button--primary button--full" href="{{ url_for('session_login') }}">Google sign in</a>
+        </div>
+        {% if not oauth_ready %}
+          <p class="profile-context">Google OAuth environment variables are not configured.</p>
+        {% endif %}
+      </div>
+
+      <div class="auth-geometry" aria-hidden="true">
+        <div class="geo-cell geo-blue"><span class="geo-circle is-black"></span></div>
+        <div class="geo-cell geo-yellow"><span class="geo-square"></span></div>
+        <div class="geo-cell geo-paper"><span class="geo-circle"></span></div>
+        <div class="geo-cell geo-green"><span class="geo-square"></span></div>
+      </div>
+    </section>
   {% else %}
-  <section>
-    <h2>Personal Dashboard</h2>
-    <p>[icon: user] Signed in as: <strong>{{ user_id }}</strong></p>
-    <p>[icon: streak] Session streak: <strong>{{ session_streak }}</strong></p>
-    <p>[icon: retention] Task complete to dashboard transition done.</p>
-    <p>TODO: Persist streak server-side instead of browser session memory.</p>
-  </section>
+    <section class="profile-hero">
+      <div class="profile-copy">
+        <div class="profile-heading">
+          <a class="profile-avatar" href="{{ url_for('profile_emoji') }}" aria-label="Change profile emoji">{{ user_emoji }}</a>
+          <div>
+            <p class="eyebrow">Streak</p>
+            <h1 class="streak-number">{{ session_streak }}</h1>
+            <p class="profile-id">{{ user_name if user_name else user_id }}</p>
+          </div>
+        </div>
+        <p class="profile-context">Current session streak. Your recent check-ins and next room picks are below.</p>
+      </div>
 
-  <hr>
+      <div class="profile-geometry" aria-hidden="true">
+        <div class="geo-cell geo-yellow"><span class="geo-square"></span></div>
+        <div class="geo-cell geo-blue"><span class="geo-circle is-black"></span></div>
+        <div class="geo-cell geo-paper"><span class="geo-circle"></span></div>
+        <div class="geo-cell geo-green"><span class="geo-square"></span></div>
+      </div>
+    </section>
 
-  <section>
-    <h3>Optional Feedback (Wireframe Capture)</h3>
+    <section class="data-section" aria-labelledby="recent-title">
+      <div class="section-title">
+        <h2 id="recent-title">Recent</h2>
+        <span>{{ checkins|length }} logs</span>
+      </div>
+      {% if checkins %}
+        <div class="history-list">
+          {% for item in checkins[:10] %}
+            <div class="history-item">
+              <span>{{ item.room_id }}</span>
+              <span>Crowd {{ item.crowdedness }}</span>
+              <span>Quiet {{ item.quietness }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="empty-state">No check-ins.</p>
+      {% endif %}
+    </section>
+
+    <section class="data-section" aria-labelledby="recs-title">
+      <div class="section-title">
+        <h2 id="recs-title">Best Next</h2>
+        <span>{{ recommendations|length }} picks</span>
+      </div>
+      {% if recommendations %}
+        <div class="data-grid">
+          {% for rec in recommendations %}
+            <article class="data-tile">
+              <p class="kicker">Score {{ rec.score if rec.score is not none else "n/a" }}</p>
+              <h3>{{ rec.room_name if rec.room_name else rec.room_id }}</h3>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="empty-state">No picks yet.</p>
+      {% endif %}
+    </section>
+
     {% if optional_feedback %}
-      <ul>
-        {% for key, value in optional_feedback.items() %}
-          <li>{{ key }}: {{ value }}</li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p>No optional feedback captured yet.</p>
+      <section class="data-section" aria-labelledby="details-title">
+        <div class="section-title">
+          <h2 id="details-title">Details</h2>
+          <span>Saved</span>
+        </div>
+        <div class="feedback-grid">
+          {% for key, value in optional_feedback.items() %}
+            <article class="feedback-tile">
+              <p class="kicker">{{ key }}</p>
+              <h3>{{ value }}</h3>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
     {% endif %}
-    <p>TODO: Store optional feedback in backend when schema is available.</p>
-  </section>
-
-  <hr>
-
-  <section>
-    <h3>My Recent Check-ins</h3>
-    {% if checkins %}
-      <ul>
-        {% for item in checkins[:10] %}
-          <li>
-            {{ item.time if item.time else "time-unavailable" }}
-            - room {{ item.room_id }}
-            - crowd {{ item.crowdedness }}
-            - quiet {{ item.quietness }}
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p>No check-ins yet.</p>
-    {% endif %}
-  </section>
-
-  <hr>
-
-  <section>
-    <h3>Recommended Rooms</h3>
-    {% if recommendations %}
-      <ol>
-        {% for rec in recommendations %}
-          <li>
-            {{ rec.room_name if rec.room_name else rec.room_id }}
-            - score {{ rec.score if rec.score is not none else "n/a" }}
-          </li>
-        {% endfor %}
-      </ol>
-    {% else %}
-      <p>No recommendations available right now.</p>
-    {% endif %}
-  </section>
-
-  <hr>
-
-  <section>
-    <a href="{{ url_for('checkin') }}">Log Another Session</a>
-  </section>
   {% endif %}
 {% endblock %}

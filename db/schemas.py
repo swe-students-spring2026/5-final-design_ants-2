@@ -2,6 +2,8 @@ USERS_COLLECTION = "users"
 ROOMS_COLLECTION = "rooms"
 CHECKINS_COLLECTION = "checkins"
 
+DEFAULT_USER_EMOJI = "\U0001F642"
+
 ROOM_IDS = [
     "bobst_ll2",
     "bobst_ll1",
