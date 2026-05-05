@@ -3,36 +3,51 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Lockin Wireframe</title>
+  <title>Lockin</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='lockin.css') }}">
 </head>
 <body>
-  <header>
-    <h1>Lockin</h1>
-    <p>[icon: app] UX Wireframe Mode (No Custom CSS)</p>
-    <nav>
-      <a href="{{ url_for('home') }}">Home</a> |
-      <a href="{{ url_for('checkin') }}">Check In</a> |
-      <a href="{{ url_for('profile') }}">Dashboard</a>
-    </nav>
-    <hr>
-  </header>
+  <div class="site-shell">
+    <header class="site-header">
+      <div class="top-bar">
+        <a class="brand-lockup" href="{{ url_for('home') }}" aria-label="Lockin home">
+          <span class="brand-mark" aria-hidden="true">L</span>
+          <span class="brand-word">Lockin</span>
+        </a>
 
-  {% with messages = get_flashed_messages() %}
-    {% if messages %}
-      <section>
-        <h2>System Messages</h2>
-        <ul>
+        <div class="session-panel">
+          {% if user_id %}
+            <span class="session-label">User</span>
+            <strong>{{ user_id }}</strong>
+            <form method="post" action="{{ url_for('session_logout') }}">
+              <button class="button button--small button--paper" type="submit">Out</button>
+            </form>
+          {% else %}
+            <a class="button button--small button--paper" href="{{ url_for('profile') }}">Sign In</a>
+          {% endif %}
+        </div>
+      </div>
+
+      <nav class="site-nav" aria-label="Primary navigation">
+        <a href="{{ url_for('home') }}">Rooms</a>
+        <a href="{{ url_for('checkin') }}">Punch</a>
+        <a href="{{ url_for('profile') }}">Streak</a>
+      </nav>
+    </header>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <section class="notice-stack" aria-label="Status messages">
           {% for message in messages %}
-            <li>{{ message }}</li>
+            <p>{{ message }}</p>
           {% endfor %}
-        </ul>
-        <hr>
-      </section>
-    {% endif %}
-  {% endwith %}
+        </section>
+      {% endif %}
+    {% endwith %}
 
-  <main>
-    {% block content %}{% endblock %}
-  </main>
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+  </div>
 </body>
 </html>

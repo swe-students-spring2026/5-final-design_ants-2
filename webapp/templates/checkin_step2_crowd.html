@@ -1,18 +1,28 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <section>
-    <p>Step 2 of 5</p>
-    <h2>Phase 1: Micro-Commitment</h2>
-    <h3>How crowded is it right now?</h3>
-    <p>[icon: tap] Tap once to auto-advance.</p>
+  <section class="flow-shell">
+    <div class="flow-copy">
+      <div class="step-meta">
+        <span class="step-chip">02</span>
+        <p class="eyebrow">Required / Crowd</p>
+      </div>
+      <h1 class="step-title">Crowd</h1>
 
-    <form method="post" action="{{ url_for('checkin_step2') }}">
-      <button type="submit" name="crowdedness" value="1">1 - Very Empty</button>
-      <button type="submit" name="crowdedness" value="2">2 - Light</button>
-      <button type="submit" name="crowdedness" value="3">3 - Medium</button>
-      <button type="submit" name="crowdedness" value="4">4 - Busy</button>
-      <button type="submit" name="crowdedness" value="5">5 - Packed</button>
-    </form>
+      <form class="rating-grid" method="post" action="{{ url_for('checkin_step2') }}">
+        <button class="rating-button" type="submit" name="crowdedness" value="1"><strong>1</strong><small>Empty</small></button>
+        <button class="rating-button" type="submit" name="crowdedness" value="2"><strong>2</strong><small>Light</small></button>
+        <button class="rating-button" type="submit" name="crowdedness" value="3"><strong>3</strong><small>Mid</small></button>
+        <button class="rating-button" type="submit" name="crowdedness" value="4"><strong>4</strong><small>Busy</small></button>
+        <button class="rating-button button--red" type="submit" name="crowdedness" value="5"><strong>5</strong><small>Packed</small></button>
+      </form>
+    </div>
+
+    <div class="flow-geometry" aria-hidden="true">
+      <div class="geo-cell geo-yellow"><span class="geo-circle"></span></div>
+      <div class="geo-cell geo-blue"><span class="geo-square"></span></div>
+      <div class="geo-cell geo-black"><span class="geo-square is-black"></span></div>
+      <div class="geo-cell geo-red"><span class="geo-circle is-black"></span></div>
+    </div>
   </section>
 {% endblock %}

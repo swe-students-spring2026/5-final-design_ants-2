@@ -352,7 +352,7 @@ def checkin_step5_optional_outlets():
         session["optional_feedback"] = optional_feedback
 
         # TODO: Persist optional Phase 3 upsell fields once backend schema supports them.
-        flash("Optional details captured for UX wireframe.")
+        flash("Details saved.")
         return redirect(url_for("profile"))
 
     return render_template("checkin_step5_outlets.html", user_id=_signed_in_user())

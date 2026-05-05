@@ -1,21 +1,33 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <section>
-    <p>Step 4 of 5</p>
-    <h2>Phase 3: Optional Upsell</h2>
-    <h3>How is the temperature?</h3>
-    <p>[icon: tap] Tap once to auto-advance.</p>
+  <section class="flow-shell">
+    <div class="flow-copy">
+      <div class="step-meta">
+        <span class="step-chip">+</span>
+        <p class="eyebrow">Optional / 1 of 2</p>
+      </div>
+      <h1 class="step-title">Temp</h1>
 
-    <form method="post" action="{{ url_for('checkin_step4_optional_temperature') }}">
-      <button type="submit" name="temperature" value="cold">Cold</button>
-      <button type="submit" name="temperature" value="comfortable">Comfortable</button>
-      <button type="submit" name="temperature" value="warm">Warm</button>
-    </form>
+      <form class="choice-grid" method="post" action="{{ url_for('checkin_step4_optional_temperature') }}">
+        <button class="choice-button button--blue" type="submit" name="temperature" value="cold"><strong>Cold</strong></button>
+        <button class="choice-button button--yellow" type="submit" name="temperature" value="comfortable"><strong>Good</strong></button>
+        <button class="choice-button button--red" type="submit" name="temperature" value="warm"><strong>Warm</strong></button>
+      </form>
 
-    <form method="post" action="{{ url_for('checkin_step4_optional_temperature') }}">
-      <input type="hidden" name="skip" value="1">
-      <button type="submit">Skip</button>
-    </form>
+      <div class="step-actions">
+        <form method="post" action="{{ url_for('checkin_step4_optional_temperature') }}">
+          <input type="hidden" name="skip" value="1">
+          <button class="button--black button--full" type="submit">Skip</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="flow-geometry" aria-hidden="true">
+      <div class="geo-cell geo-blue"><span class="geo-circle is-black"></span></div>
+      <div class="geo-cell geo-yellow"><span class="geo-square"></span></div>
+      <div class="geo-cell geo-red"><span class="geo-circle"></span></div>
+      <div class="geo-cell geo-paper"><span class="geo-square"></span></div>
+    </div>
   </section>
 {% endblock %}
