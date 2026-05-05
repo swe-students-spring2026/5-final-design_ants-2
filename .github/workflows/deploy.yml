@@ -8,6 +8,12 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: prod
+    env:
+      TAG: ${{ vars.DOCKERHUB_TAG }}
+      CHECKIN_PORT: ${{ vars.CHECKIN_PORT }}
+      RECOMMENDATION_PORT: ${{ vars.RECOMMENDATION_PORT }}
+      MONGO_DATA_DIR: ${{ vars.MONGO_DATA_DIR }}
+      WEBAPP_PORT: ${{ vars.WEBAPP_PORT }}
     steps:
       - uses: actions/checkout@v4
 
@@ -29,10 +35,14 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ vars.SSH_HOST }} >> ~/.ssh/known_hosts
           ssh ${{ secrets.SSH_USER }}@${{ vars.SSH_HOST }} "\
+            export TAG='${{ vars.DOCKERHUB_TAG }}' && \
+            export CHECKIN_PORT='${{ vars.CHECKIN_PORT }}' && \
+            export RECOMMENDATION_PORT='${{ vars.RECOMMENDATION_PORT }}' && \
+            export MONGO_DATA_DIR='${{ vars.MONGO_DATA_DIR }}' && \
+            export WEBAPP_PORT='${{ vars.WEBAPP_PORT }}'
             mkdir -p ${{ vars.DEPLOY_PATH }} && \
             cd ${{ vars.DEPLOY_PATH }} && \
+            mkdir -p \"\${MONGO_DATA_DIR:-./mongodb}\" && \
             curl -sL https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/docker-compose.yml -o docker-compose.yml && \
-            export PORT=${{ vars.DEPLOY_PORT }} && \
-            export TAG=${{ vars.DOCKERHUB_TAG }} && \
             docker compose pull && \
             docker compose up -d"
