@@ -1,5 +1,5 @@
 # Library Crowdedness — NYU Bobst
-[![release](https://img.shields.io/github/v/release/swe-students-spring2026/0-git-practice-DaobaRoger12)](https://github.com/swe-students-spring2026/0-git-practice-DaobaRoger12/releases)
+[![release](https://img.shields.io/github/v/release/swe-students-spring2026/5-final-design_ants-2)](https://github.com/swe-students-spring2026/5-final-design_ants-2/releases)
 [![checkin-service](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/checkin-service.yml/badge.svg)](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/checkin-service.yml)
 [![recommendation-service](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/recommendation-service.yml/badge.svg)](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/recommendation-service.yml)
 [![webapp](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/webapp.yml/badge.svg)](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/webapp.yml)
