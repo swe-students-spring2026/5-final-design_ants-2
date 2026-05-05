@@ -380,6 +380,20 @@ def _checked_in_today(checkins):
     return _latest_checkin_today(checkins) is not None
 
 
+def _checked_in_room_today(checkins, room_id):
+    if not room_id:
+        return False
+
+    today = datetime.now(USER_TIMEZONE).date()
+    for checkin in checkins:
+        if checkin.get("room_id") != room_id:
+            continue
+        checkin_time = _checkin_datetime(checkin.get("time"))
+        if checkin_time and checkin_time.date() == today:
+            return True
+    return False
+
+
 def _latest_checkin(checkins):
     latest = None
     latest_time = None
@@ -669,15 +683,16 @@ def checkin_step1():
         )
         return redirect(url_for("home"))
 
-    has_checked_in_today = _checked_in_today(recent_checkins)
-
     if flask_request.method == "POST":
         chosen_room = flask_request.form.get("room_id", "").strip()
         if not chosen_room:
             flash("Pick a location to continue.")
             return redirect(url_for("checkin_step1"))
 
-        if has_checked_in_today and flask_request.form.get("confirm_repeat") != "1":
+        if (
+            _checked_in_room_today(recent_checkins, chosen_room)
+            and flask_request.form.get("confirm_repeat") != "1"
+        ):
             repeat_room = _room_display_name(chosen_room, rooms)
             return render_template(
                 "checkin_step1_location.html",

@@ -103,7 +103,7 @@ def test_checkin_step1_hides_room_ids_and_last_room(client, monkeypatch):
 def test_checkin_step1_repeat_requires_confirmation(client, monkeypatch):
     rooms = [{'_id': 'bobst_3', 'name': 'Bobst 3F'}]
     old_checkin = {
-        'room_id': 'bobst_ll1',
+        'room_id': 'bobst_3',
         'time': (datetime.now(webapp_module.USER_TIMEZONE) - timedelta(minutes=31)).isoformat(),
     }
     monkeypatch.setattr(webapp_module, '_room_options', lambda: (rooms, None))
@@ -119,6 +119,30 @@ def test_checkin_step1_repeat_requires_confirmation(client, monkeypatch):
 
     assert response.status_code == 200
     assert b'Are you sure you returned to Bobst 3F and want to punch in again?' in response.data
+
+
+def test_checkin_step1_skips_repeat_confirmation_for_different_room(client, monkeypatch):
+    rooms = [
+        {'_id': 'bobst_3', 'name': 'Bobst 3F'},
+        {'_id': 'bobst_ll1', 'name': 'Bobst LL1'},
+    ]
+    old_checkin = {
+        'room_id': 'bobst_ll1',
+        'time': (datetime.now(webapp_module.USER_TIMEZONE) - timedelta(minutes=31)).isoformat(),
+    }
+    monkeypatch.setattr(webapp_module, '_room_options', lambda: (rooms, None))
+    monkeypatch.setattr(
+        webapp_module,
+        '_recent_user_checkins',
+        lambda user_id: ([old_checkin], None),
+    )
+    with client.session_transaction() as sess:
+        sess['user_id'] = 'person@nyu.edu'
+
+    response = client.post('/checkin/step1', data={'room_id': 'bobst_3'})
+
+    assert response.status_code == 302
+    assert response.headers['Location'].endswith('/checkin/step2')
 
 
 def test_checkin_hook_plain_punch_success(client, monkeypatch):
