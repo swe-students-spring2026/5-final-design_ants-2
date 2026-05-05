@@ -1,12 +1,14 @@
-# Library Crowdedness — NYU Bobst
+# Lockin
+
 [![release](https://img.shields.io/github/v/release/swe-students-spring2026/5-final-design_ants-2)](https://github.com/swe-students-spring2026/5-final-design_ants-2/releases)
 [![checkin-service](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/checkin-service.yml/badge.svg)](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/checkin-service.yml)
 [![recommendation-service](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/recommendation-service.yml/badge.svg)](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/recommendation-service.yml)
 [![webapp](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/webapp.yml/badge.svg)](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/webapp.yml)
+[![db](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/db.yml/badge.svg)](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/db.yml)
 [![CD (dev)](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/deploy.yml/badge.svg?branch=dev)](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/deploy.yml?query=branch%3Adev)
 [![CD (prod)](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/deploy.yml/badge.svg?branch=prod)](https://github.com/swe-students-spring2026/5-final-design_ants-2/actions/workflows/deploy.yml?query=branch%3Aprod)
 
-A web app for finding the best place to study in NYU's Bobst library. Students report how crowded and quiet each floor is, and the system blends those live reports with historical patterns to rank rooms by "study-ability".
+A web app for finding the best place to study on the campus. Students report how crowded and quiet each floor is, and the system blends those live reports with historical patterns to rank rooms by "study-ability".
 
 ## Team
 
@@ -20,12 +22,12 @@ A web app for finding the best place to study in NYU's Bobst library. Students r
 
 Four services orchestrated by Docker Compose:
 
-| Service | Purpose |
-| --- | --- |
-| `webapp` | User-facing UI |
-| `checkin-service` | Accepts check-ins, exposes rooms API |
-| `recommendation-service` | Ranks rooms (live + forecast) |
-| `mongodb` | Shared persistence |
+| Service                  | Purpose                              |
+| ------------------------ | ------------------------------------ |
+| `webapp`                 | User-facing UI                       |
+| `checkin-service`        | Accepts check-ins, exposes rooms API |
+| `recommendation-service` | Ranks rooms (live + forecast)        |
+| `mongodb`                | Shared persistence                   |
 
 Each Python service has its own `Dockerfile`, its own test suite, and its own GitHub Actions workflow under [`.github/workflows/`](.github/workflows/).
 
@@ -36,7 +38,6 @@ Published on Docker Hub:
 - [incrediblez7/5-final-design_ants-checkin on Docker Hub](https://hub.docker.com/r/incrediblez7/5-final-design_ants-checkin)
 - [incrediblez7/5-final-design_ants-recommendation on Docker Hub](https://hub.docker.com/r/incrediblez7/5-final-design_ants-recommendation)
 - [incrediblez7/5-final-design_ants-webapp on Docker Hub](https://hub.docker.com/r/incrediblez7/5-final-design_ants-webapp)
-
 
 ## Quick start
 
@@ -90,25 +91,25 @@ Each service reads its config from environment variables. Defaults work for the 
 
 ### `checkin-service/.env.example`
 
-| Variable | Default | Notes |
-| --- | --- | --- |
-| `MONGO_URI` | `mongodb://mongodb:27017/` | Use `mongodb://localhost:27019/` if running this service outside Docker |
-| `DB_NAME` | `nyu_library_app` | Shared with recommendation-service |
-| `PORT` | `5000` | |
-| `GOOGLE_CLIENT_ID` | _(dummy)_ | Required only if Google OAuth login is enabled |
-| `GOOGLE_CLIENT_SECRET` | _(dummy)_ | Same as above |
-| `GOOGLE_REDIRECT_URI` | `http://localhost:3000/session/oauth/callback` | Must match an authorized redirect URI in your Google Cloud OAuth client |
+| Variable               | Default                                        | Notes                                                                   |
+| ---------------------- | ---------------------------------------------- | ----------------------------------------------------------------------- |
+| `MONGO_URI`            | `mongodb://mongodb:27017/`                     | Use `mongodb://localhost:27019/` if running this service outside Docker |
+| `DB_NAME`              | `nyu_library_app`                              | Shared with recommendation-service                                      |
+| `PORT`                 | `5000`                                         |                                                                         |
+| `GOOGLE_CLIENT_ID`     | _(dummy)_                                      | Required only if Google OAuth login is enabled                          |
+| `GOOGLE_CLIENT_SECRET` | _(dummy)_                                      | Same as above                                                           |
+| `GOOGLE_REDIRECT_URI`  | `http://localhost:3000/session/oauth/callback` | Must match an authorized redirect URI in your Google Cloud OAuth client |
 
 ### `recommendation-service/.env.example`
 
-| Variable | Default | Notes |
-| --- | --- | --- |
-| `MONGO_URI` | `mongodb://localhost:27017/` | Compose overrides to `mongodb://mongodb:27017/` |
-| `DB_NAME` | `nyu_library_app` | Must match checkin-service |
-| `LIVE_WINDOW_MINUTES` | `30` | A check-in is "live" if newer than this |
-| `LIVE_WEIGHT` | `0.7` | Blend weight on live signal vs. history (0–1) |
-| `DEFAULT_CROWD` | `3.0` | Fallback when no data exists |
-| `DEFAULT_QUIET` | `3.0` | Fallback when no data exists |
+| Variable              | Default                      | Notes                                           |
+| --------------------- | ---------------------------- | ----------------------------------------------- |
+| `MONGO_URI`           | `mongodb://localhost:27017/` | Compose overrides to `mongodb://mongodb:27017/` |
+| `DB_NAME`             | `nyu_library_app`            | Must match checkin-service                      |
+| `LIVE_WINDOW_MINUTES` | `30`                         | A check-in is "live" if newer than this         |
+| `LIVE_WEIGHT`         | `0.7`                        | Blend weight on live signal vs. history (0–1)   |
+| `DEFAULT_CROWD`       | `3.0`                        | Fallback when no data exists                    |
+| `DEFAULT_QUIET`       | `3.0`                        | Fallback when no data exists                    |
 
 The `webapp` service shares `checkin-service/.env` (it needs the same Google OAuth credentials to render the login flow). It does not have its own `.env.example`.
 
