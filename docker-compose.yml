@@ -4,11 +4,7 @@ services:
     ports:
       - "27019:27017"
     volumes:
-<<<<<<< HEAD
       - ${MONGO_DATA_DIR:-./mongodb}:/data/db
-=======
-      - ./mongodb:/data/db
->>>>>>> origin/main
     healthcheck:
       test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok' | grep -q 1"]
       interval: 10s
@@ -25,12 +21,6 @@ services:
     env_file: ./checkin-service/.env
     ports:
       - "${CHECKIN_PORT:-5000}:5000"
-<<<<<<< HEAD
-=======
-    environment:
-      - MONGO_URI=mongodb://mongodb:27017/
-      - DB_NAME=nyu_library_app
->>>>>>> origin/main
     depends_on:
       mongodb:
         condition: service_healthy
@@ -44,12 +34,6 @@ services:
     env_file: ./recommendation-service/.env
     ports:
       - "${RECOMMENDATION_PORT:-8000}:8000"
-<<<<<<< HEAD
-=======
-    environment:
-      - MONGO_URI=mongodb://mongodb:27017/
-      - DB_NAME=nyu_library_app
->>>>>>> origin/main
     depends_on:
       mongodb:
         condition: service_healthy
@@ -62,13 +46,7 @@ services:
     image: incrediblez7/5-final-design_ants-webapp:${TAG:-latest}
     env_file: ./checkin-service/.env
     ports:
-<<<<<<< HEAD
       - "${WEBAPP_PORT:-3000}:5000"
-=======
-      - "3000:5000"
-    environment:
-      - GOOGLE_REDIRECT_URI=http://localhost:3000/session/oauth/callback
->>>>>>> origin/main
     depends_on:
       checkin-service:
         condition: service_started

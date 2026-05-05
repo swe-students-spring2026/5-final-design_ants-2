@@ -1,12 +1,3 @@
-<<<<<<< HEAD
-from flask import Flask
-app = Flask(__name__)
-@app.route("/")
-def index():
-    return "Welcome to Production Template."
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=3000)
-=======
 import os
 from collections import Counter
 from datetime import datetime, timedelta, timezone
@@ -1136,4 +1127,3 @@ def profile():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
->>>>>>> origin/main
