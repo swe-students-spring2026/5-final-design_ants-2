@@ -23,6 +23,14 @@ jobs:
           username: ${{ vars.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Write env files for build
+        env:
+          CHECKIN_ENV: ${{ secrets.CHECKIN_ENV }}
+          RECOMMENDATION_ENV: ${{ secrets.RECOMMENDATION_ENV }}
+        run: |
+          printf '%s' "$CHECKIN_ENV" > checkin-service/.env
+          printf '%s' "$RECOMMENDATION_ENV" > recommendation-service/.env
+
       - name: Build and push images
         run: |
           docker compose build
@@ -34,6 +42,9 @@ jobs:
           echo "${{ secrets.SSH_PRIV_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ vars.SSH_HOST }} >> ~/.ssh/known_hosts
+          ssh ${{ secrets.SSH_USER }}@${{ vars.SSH_HOST }} "mkdir -p ${{ vars.DEPLOY_PATH }}/checkin-service ${{ vars.DEPLOY_PATH }}/recommendation-service"
+          scp checkin-service/.env       ${{ secrets.SSH_USER }}@${{ vars.SSH_HOST }}:${{ vars.DEPLOY_PATH }}/checkin-service/.env
+          scp recommendation-service/.env ${{ secrets.SSH_USER }}@${{ vars.SSH_HOST }}:${{ vars.DEPLOY_PATH }}/recommendation-service/.env
           ssh ${{ secrets.SSH_USER }}@${{ vars.SSH_HOST }} "\
             export TAG='${{ vars.DOCKERHUB_TAG }}' && \
             export CHECKIN_PORT='${{ vars.CHECKIN_PORT }}' && \
