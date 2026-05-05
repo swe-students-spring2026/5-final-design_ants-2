@@ -49,5 +49,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
+      - name: Show installed packages
+        run: python -m pip list
+
       - name: Run pytest with coverage
         run: python -m pytest tests -v --cov=. --cov-report=term-missing
