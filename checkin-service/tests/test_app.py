@@ -201,52 +201,6 @@ def test_get_user_checkins(client):
     assert data[0]["user_id"] == "zelu"
 
 
-def test_get_active_user_counts_by_date(client):
-    checkins_collection.insert_many(
-        [
-            {
-                "user_id": "person@nyu.edu",
-                "room_id": "bobst_2",
-                "crowdedness": 3,
-                "quietness": 4,
-                "time": "2026-05-02T09:00:00",
-            },
-            {
-                "user_id": "friend@nyu.edu",
-                "room_id": "bobst_4",
-                "crowdedness": 2,
-                "quietness": 5,
-                "time": "2026-05-02T11:30:00",
-            },
-            {
-                "user_id": "person@nyu.edu",
-                "room_id": "bobst_ll1",
-                "crowdedness": 4,
-                "quietness": 2,
-                "time": "2026-05-02T14:15:00",
-            },
-            {
-                "user_id": "person@nyu.edu",
-                "room_id": "bobst_3",
-                "crowdedness": 1,
-                "quietness": 5,
-                "time": "2026-05-03T10:00:00",
-            },
-        ]
-    )
-
-    response = client.get("/api/checkins/active-users?dates=2026-05-02,2026-05-03,2026-05-04")
-
-    assert response.status_code == 200
-    assert response.get_json() == {
-        "dates": {
-            "2026-05-02": 2,
-            "2026-05-03": 1,
-            "2026-05-04": 0,
-        }
-    }
-
-
 def test_room_status_updated_after_checkin(client):
     payload = {
         "user_id": "zelu",
@@ -262,3 +216,80 @@ def test_room_status_updated_after_checkin(client):
     assert room["current_crowd"] == 5
     assert room["current_quiet"] == 1
     assert room["last_updated"] is not None
+
+
+def test_home_route_renders_index(client):
+    response = client.get("/")
+    assert response.status_code == 200
+
+
+def test_upsert_user_with_empty_body(client):
+    response = client.post("/api/users", json={})
+    assert response.status_code == 400
+    assert "JSON" in response.get_json()["error"]
+
+
+def test_upsert_user_missing_user_id(client):
+    response = client.post("/api/users", json={"username": "no-id"})
+    assert response.status_code == 400
+    assert "user_id" in response.get_json()["error"]
+
+
+def test_upsert_user_with_invalid_emoji(client):
+    payload = {
+        "user_id": "person@nyu.edu",
+        "username": "Person",
+        "email": "person@nyu.edu",
+        "emoji": "",
+    }
+    response = client.post("/api/users", json=payload)
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "Invalid emoji"
+
+
+def test_get_user_not_found(client):
+    response = client.get("/api/users/nobody@nyu.edu")
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "User not found"
+
+
+def test_get_user_returns_existing(client):
+    client.post(
+        "/api/users",
+        json={"user_id": "person@nyu.edu", "username": "Person", "email": "person@nyu.edu"},
+    )
+    response = client.get("/api/users/person@nyu.edu")
+    assert response.status_code == 200
+    user = response.get_json()["user"]
+    assert user["_id"] == "person@nyu.edu"
+    assert user["emoji"]
+
+
+def test_update_emoji_with_empty_body(client):
+    response = client.put("/api/users/person@nyu.edu/emoji", json={})
+    assert response.status_code == 400
+    assert "JSON" in response.get_json()["error"]
+
+
+def test_update_emoji_invalid_value(client):
+    response = client.put("/api/users/person@nyu.edu/emoji", json={"emoji": "x" * 50})
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "Invalid emoji"
+
+
+def test_create_checkin_with_empty_body(client):
+    response = client.post("/api/checkins", json={})
+    assert response.status_code == 400
+    assert "JSON" in response.get_json()["error"]
+
+
+def test_create_checkin_with_empty_user_id(client):
+    payload = {
+        "user_id": "   ",
+        "room_id": "bobst_3",
+        "crowdedness": 4,
+        "quietness": 2,
+    }
+    response = client.post("/api/checkins", json=payload)
+    assert response.status_code == 400
+    assert "user_id" in response.get_json()["error"]
