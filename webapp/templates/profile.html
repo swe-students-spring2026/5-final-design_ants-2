@@ -23,81 +23,46 @@
       </div>
     </section>
   {% else %}
-    <section class="profile-hero">
-      <div class="profile-copy">
-        <div class="profile-heading">
-          <a class="profile-avatar" href="{{ url_for('profile_emoji') }}" aria-label="Change profile emoji">{{ user_emoji }}</a>
-          <div>
-            <p class="eyebrow">Streak</p>
-            <h1 class="streak-number">{{ session_streak }}</h1>
-            <p class="profile-id">{{ user_name if user_name else user_id }}</p>
-          </div>
+    <div class="page-grid page-grid--profile">
+      <section class="profile-hero-card" aria-labelledby="profile-streak-title">
+        <div>
+          <h1 class="profile-streak-value" id="profile-streak-title">{{ profile_summary.streak_days }}</h1>
+          <p class="profile-streak-copy">day streak!</p>
         </div>
-        <p class="profile-context">Current session streak. Your recent check-ins and next room picks are below.</p>
-      </div>
-
-      <div class="profile-geometry" aria-hidden="true">
-        <div class="geo-cell geo-yellow"><span class="geo-square"></span></div>
-        <div class="geo-cell geo-blue"><span class="geo-circle is-black"></span></div>
-        <div class="geo-cell geo-paper"><span class="geo-circle"></span></div>
-        <div class="geo-cell geo-green"><span class="geo-square"></span></div>
-      </div>
-    </section>
-
-    <section class="data-section" aria-labelledby="recent-title">
-      <div class="section-title">
-        <h2 id="recent-title">Recent</h2>
-        <span>{{ checkins|length }} logs</span>
-      </div>
-      {% if checkins %}
-        <div class="history-list">
-          {% for item in checkins[:10] %}
-            <div class="history-item">
-              <span>{{ item.room_name }}</span>
-              <span>Crowd {{ item.crowdedness }}</span>
-              <span>Quiet {{ item.quietness }}</span>
-            </div>
-          {% endfor %}
-        </div>
-      {% else %}
-        <p class="empty-state">No check-ins.</p>
-      {% endif %}
-    </section>
-
-    <section class="data-section" aria-labelledby="recs-title">
-      <div class="section-title">
-        <h2 id="recs-title">Best Next</h2>
-        <span>{{ recommendations|length }} picks</span>
-      </div>
-      {% if recommendations %}
-        <div class="data-grid">
-          {% for rec in recommendations %}
-            <article class="data-tile">
-              <p class="kicker">Score {{ rec.score if rec.score is not none else "n/a" }}</p>
-              <h3>{{ rec.room_name if rec.room_name else "Study room" }}</h3>
-            </article>
-          {% endfor %}
-        </div>
-      {% else %}
-        <p class="empty-state">No picks yet.</p>
-      {% endif %}
-    </section>
-
-    {% if optional_feedback %}
-      <section class="data-section" aria-labelledby="details-title">
-        <div class="section-title">
-          <h2 id="details-title">Details</h2>
-          <span>Saved</span>
-        </div>
-        <div class="feedback-grid">
-          {% for key, value in optional_feedback.items() %}
-            <article class="feedback-tile">
-              <p class="kicker">{{ key }}</p>
-              <h3>{{ value }}</h3>
-            </article>
-          {% endfor %}
-        </div>
+        <div class="profile-stage" aria-label="Streak milestone">{{ profile_summary.streak_emoji }}</div>
       </section>
-    {% endif %}
+
+      <section class="profile-card-grid" aria-label="Streak details">
+        <article class="profile-stat-card profile-stat-card--paper">
+          <p class="profile-stat-label">You've helped</p>
+          <p class="profile-stat-number">{{ profile_summary.peers_total }}</p>
+          <p class="profile-stat-copy">Peers so far</p>
+        </article>
+
+        <article class="profile-stat-card profile-stat-card--paper">
+          <p class="profile-stat-label">You've helped</p>
+          <p class="profile-stat-number">{{ profile_summary.peers_this_week }}</p>
+          <p class="profile-stat-copy">Peers this week</p>
+        </article>
+
+        <article class="profile-stat-card profile-stat-card--yellow">
+          <p class="profile-stat-label">Favorite Hour</p>
+          {% if profile_summary.favorite_hour %}
+            <p class="profile-stat-number">{{ profile_summary.favorite_hour.label }}</p>
+          {% else %}
+            <p class="profile-empty-copy">No punches yet</p>
+          {% endif %}
+        </article>
+
+        <article class="profile-stat-card profile-stat-card--ink">
+          <p class="profile-stat-label">Favorite Space</p>
+          {% if profile_summary.favorite_space %}
+            <p class="profile-stat-number">{{ profile_summary.favorite_space.label }}</p>
+          {% else %}
+            <p class="profile-empty-copy profile-empty-copy--inverse">No punches yet</p>
+          {% endif %}
+        </article>
+      </section>
+    </div>
   {% endif %}
 {% endblock %}
