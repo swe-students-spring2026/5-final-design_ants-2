@@ -41,7 +41,9 @@ def test_debug_home_cta_hidden(client):
     response = client.get('/debug/home/done')
 
     assert response.status_code == 200
-    assert b'Punch in again' in response.data
+    assert b"You've Punched In Today!" in response.data
+    assert b'You are really locked in.' in response.data
+    assert b'Punch in again' not in response.data
     assert b'Bobst LL2' in response.data
     assert b'Bobst 9F' in response.data
 
