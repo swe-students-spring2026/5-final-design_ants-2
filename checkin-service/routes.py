@@ -1,5 +1,7 @@
+from collections import defaultdict
 from flask import Blueprint, request, jsonify, render_template
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from db.db import checkins as checkins_collection, rooms as rooms_collection, users as users_collection
 from db.schemas import DEFAULT_USER_EMOJI
 
@@ -47,6 +49,24 @@ def _checkin_datetime(value):
             checkin_time = checkin_time.astimezone(timezone.utc).replace(tzinfo=None)
         return checkin_time
     return None
+
+
+def _checkin_date_key(value, target_timezone=timezone.utc):
+    checkin_time = _checkin_datetime(value)
+    if not checkin_time:
+        return None
+    aware_time = checkin_time.replace(tzinfo=timezone.utc).astimezone(target_timezone)
+    return aware_time.date().isoformat()
+
+
+def _request_timezone():
+    timezone_name = str(request.args.get("timezone") or "").strip()
+    if not timezone_name:
+        return timezone.utc
+    try:
+        return ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        return None
 
 
 def _checkin_cooldown_remaining(user_id):
@@ -250,3 +270,41 @@ def get_user_checkins(user_id):
         checkins_collection.find({"user_id": user_id}, {"_id": 0}).sort("time", -1)
     )
     return jsonify(records), 200
+
+
+@bp.route("/api/checkins/active-users", methods=["GET"])
+def get_active_user_counts():
+    target_timezone = _request_timezone()
+    if target_timezone is None:
+        return jsonify({"error": "Invalid timezone"}), 400
+
+    requested_dates = []
+    for raw_date in str(request.args.get("dates", "")).split(","):
+        date_key = raw_date.strip()
+        if not date_key:
+            continue
+        try:
+            datetime.strptime(date_key, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"error": "dates must use YYYY-MM-DD format"}), 400
+        requested_dates.append(date_key)
+
+    requested_date_set = set(requested_dates)
+    active_users_by_day = defaultdict(set)
+    for record in checkins_collection.find({}, {"_id": 0, "user_id": 1, "time": 1}):
+        date_key = _checkin_date_key(record.get("time"), target_timezone)
+        if not date_key:
+            continue
+        if requested_date_set and date_key not in requested_date_set:
+            continue
+
+        user_id = str(record.get("user_id") or "").strip()
+        if user_id:
+            active_users_by_day[date_key].add(user_id)
+
+    if requested_dates:
+        counts = {date_key: len(active_users_by_day.get(date_key, set())) for date_key in requested_dates}
+    else:
+        counts = {date_key: len(users) for date_key, users in sorted(active_users_by_day.items())}
+
+    return jsonify({"dates": counts}), 200

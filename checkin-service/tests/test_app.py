@@ -201,6 +201,52 @@ def test_get_user_checkins(client):
     assert data[0]["user_id"] == "zelu"
 
 
+def test_get_active_user_counts_by_date(client):
+    checkins_collection.insert_many(
+        [
+            {
+                "user_id": "person@nyu.edu",
+                "room_id": "bobst_2",
+                "crowdedness": 3,
+                "quietness": 4,
+                "time": "2026-05-02T09:00:00",
+            },
+            {
+                "user_id": "friend@nyu.edu",
+                "room_id": "bobst_4",
+                "crowdedness": 2,
+                "quietness": 5,
+                "time": "2026-05-02T11:30:00",
+            },
+            {
+                "user_id": "person@nyu.edu",
+                "room_id": "bobst_ll1",
+                "crowdedness": 4,
+                "quietness": 2,
+                "time": "2026-05-02T14:15:00",
+            },
+            {
+                "user_id": "person@nyu.edu",
+                "room_id": "bobst_3",
+                "crowdedness": 1,
+                "quietness": 5,
+                "time": "2026-05-03T10:00:00",
+            },
+        ]
+    )
+
+    response = client.get("/api/checkins/active-users?dates=2026-05-02,2026-05-03,2026-05-04")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "dates": {
+            "2026-05-02": 2,
+            "2026-05-03": 1,
+            "2026-05-04": 0,
+        }
+    }
+
+
 def test_room_status_updated_after_checkin(client):
     payload = {
         "user_id": "zelu",

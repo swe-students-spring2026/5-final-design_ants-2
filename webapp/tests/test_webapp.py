@@ -249,3 +249,58 @@ def test_oauth_login_normalizes_to_callback_host(client, monkeypatch):
 
     assert response.status_code == 302
     assert response.location == 'http://localhost:3000/session/login'
+
+
+def test_profile_shows_requested_metrics_only(client, monkeypatch):
+    now = datetime.now(webapp_module.USER_TIMEZONE).replace(minute=0, second=0, microsecond=0)
+    today = now.replace(hour=14)
+    yesterday = today - timedelta(days=1)
+    older = today - timedelta(days=8)
+
+    checkins = [
+        {'room_id': 'bobst_3', 'time': today.isoformat()},
+        {'room_id': 'bobst_3', 'time': today.replace(hour=9).isoformat()},
+        {'room_id': 'bobst_ll1', 'time': yesterday.replace(hour=9).isoformat()},
+        {'room_id': 'bobst_4', 'time': older.replace(hour=11).isoformat()},
+    ]
+    rooms = [
+        {'_id': 'bobst_3', 'name': 'Bobst 3F'},
+        {'_id': 'bobst_ll1', 'name': 'Bobst LL1'},
+        {'_id': 'bobst_4', 'name': 'Bobst 4F'},
+    ]
+    active_counts = {
+        today.date().isoformat(): 5,
+        yesterday.date().isoformat(): 3,
+        older.date().isoformat(): 2,
+    }
+    week_start = today.date() - timedelta(days=today.weekday())
+    expected_week = 10 + (3 if yesterday.date() >= week_start else 0)
+
+    monkeypatch.setattr(webapp_module, '_recent_user_checkins', lambda user_id: (checkins, None))
+    monkeypatch.setattr(webapp_module, '_room_options', lambda: (rooms, None))
+    monkeypatch.setattr(webapp_module, '_user_profile', lambda user_id: ({'emoji': ':-)'}, None))
+    monkeypatch.setattr(webapp_module, '_active_user_counts_by_date', lambda date_keys: (active_counts, None))
+
+    with client.session_transaction() as sess:
+        sess['user_id'] = 'person@nyu.edu'
+
+    response = client.get('/profile')
+
+    assert response.status_code == 200
+    assert b'>2<' in response.data
+    assert b'You\'ve helped' in response.data
+    assert b'>15<' in response.data
+    assert f'>{expected_week}<'.encode() in response.data
+    assert b'9 AM' in response.data
+    assert b'Bobst 3F' in response.data
+    assert b'Impact' not in response.data
+    assert b'Patterns' not in response.data
+
+
+def test_debug_profile_streak_stage_route(client):
+    response = client.get('/debug/profile/streak/25')
+
+    assert response.status_code == 200
+    assert b'>25<' in response.data
+    assert '🐦‍🔥'.encode('utf-8') in response.data
+    assert b'Bobst 3F' in response.data

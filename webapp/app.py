@@ -1,5 +1,6 @@
 import os
-from datetime import datetime, timezone
+from collections import Counter
+from datetime import datetime, timedelta, timezone
 from urllib import error, parse, request
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -17,6 +18,7 @@ OAUTH_STATE_LIMIT = 8
 DEFAULT_USER_EMOJI = "\U0001F642"
 EMOJI_MAX_LENGTH = 16
 CHECKIN_COOLDOWN_SECONDS = 30 * 60
+STREAK_STAGE_EMOJIS = ["👌", "👍", "🫡", "🦅", "🔥", "🐦‍🔥", "🌋"]
 DEBUG_ROOMS = [
     {"_id": "debug_ll2", "name": "Bobst LL2", "current_crowd": 5, "current_quiet": 4},
     {"_id": "debug_ll1", "name": "Bobst LL1", "current_crowd": 3, "current_quiet": 3},
@@ -349,6 +351,40 @@ def _recent_user_checkins(user_id):
     return data or [], None
 
 
+def _active_user_counts_by_date(date_keys):
+    normalized_dates = []
+    for date_key in date_keys:
+        value = str(date_key or "").strip()
+        if value and value not in normalized_dates:
+            normalized_dates.append(value)
+
+    if not normalized_dates:
+        return {}, None
+
+    timezone_name = getattr(USER_TIMEZONE, "key", None) or "UTC"
+    query = parse.urlencode(
+        {
+            "dates": ",".join(normalized_dates),
+            "timezone": timezone_name,
+        }
+    )
+    ok, data, err = _safe_json_get(f"{CHECKIN_SERVICE_URL}/api/checkins/active-users?{query}")
+    if not ok:
+        return {}, err
+
+    counts = data.get("dates") if isinstance(data, dict) else {}
+    if not isinstance(counts, dict):
+        return {}, "Invalid active-user payload"
+
+    normalized_counts = {}
+    for date_key in normalized_dates:
+        try:
+            normalized_counts[date_key] = max(0, int(counts.get(date_key, 0) or 0))
+        except (TypeError, ValueError):
+            normalized_counts[date_key] = 0
+    return normalized_counts, None
+
+
 def _recommendations(top=3):
     ok, data, err = _safe_json_get(
         f"{RECOMMENDATION_SERVICE_URL}/api/recommend?{parse.urlencode({'top': top})}"
@@ -472,6 +508,123 @@ def _decorate_checkins(checkins, rooms):
     ]
 
 
+def _checkin_date_key(value):
+    checkin_time = _checkin_datetime(value)
+    if not checkin_time:
+        return None
+    return checkin_time.date().isoformat()
+
+
+def _favorite_hour_label(hour_value):
+    hour = int(hour_value) % 24
+    suffix = "AM" if hour < 12 else "PM"
+    display_hour = hour % 12 or 12
+    return f"{display_hour} {suffix}"
+
+
+def _streak_stage_emoji(streak_days):
+    milestone_index = max(0, min(len(STREAK_STAGE_EMOJIS) - 1, int(streak_days) // 5))
+    return STREAK_STAGE_EMOJIS[milestone_index]
+
+
+def _profile_streak_days(checkins):
+    today = datetime.now(USER_TIMEZONE).date()
+    punched_dates = {
+        checkin_time.date()
+        for checkin in checkins
+        if (checkin_time := _checkin_datetime(checkin.get("time")))
+    }
+    if today not in punched_dates:
+        return 0
+
+    streak_days = 0
+    current_day = today
+    while current_day in punched_dates:
+        streak_days += 1
+        current_day -= timedelta(days=1)
+    return streak_days
+
+
+def _profile_peer_totals(checkins, active_user_counts):
+    today = datetime.now(USER_TIMEZONE).date()
+    week_start = today - timedelta(days=today.weekday())
+    peers_total = 0
+    peers_this_week = 0
+
+    for checkin in checkins:
+        date_key = _checkin_date_key(checkin.get("time"))
+        if not date_key:
+            continue
+
+        active_users = int(active_user_counts.get(date_key, 0) or 0)
+        peers_total += active_users
+        if date_key >= week_start.isoformat():
+            peers_this_week += active_users
+
+    return peers_total, peers_this_week
+
+
+def _profile_favorite_hours(checkins):
+    hour_counts = Counter()
+    for checkin in checkins:
+        checkin_time = _checkin_datetime(checkin.get("time"))
+        if not checkin_time:
+            continue
+        hour_counts[checkin_time.hour] += 1
+
+    ranked_hours = sorted(hour_counts.items(), key=lambda item: (-item[1], item[0]))
+    if not ranked_hours:
+        return None
+
+    hour_value, count = ranked_hours[0]
+    return {
+        "label": _favorite_hour_label(hour_value),
+        "count": count,
+    }
+
+
+def _profile_favorite_space(checkins):
+    space_counts = Counter()
+    for checkin in checkins:
+        room_name = str(checkin.get("room_name") or "").strip() or "Study room"
+        space_counts[room_name] += 1
+
+    if not space_counts:
+        return None
+
+    room_name, count = sorted(space_counts.items(), key=lambda item: (-item[1], item[0]))[0]
+    return {
+        "label": room_name,
+        "count": count,
+    }
+
+
+def _profile_summary(checkins, rooms, active_user_counts):
+    decorated_checkins = _decorate_checkins(checkins, rooms)
+    streak_days = _profile_streak_days(decorated_checkins)
+    peers_total, peers_this_week = _profile_peer_totals(decorated_checkins, active_user_counts)
+    return {
+        "streak_days": streak_days,
+        "streak_emoji": _streak_stage_emoji(streak_days),
+        "peers_total": peers_total,
+        "peers_this_week": peers_this_week,
+        "favorite_hour": _profile_favorite_hours(decorated_checkins),
+        "favorite_space": _profile_favorite_space(decorated_checkins),
+    }
+
+
+def _debug_profile_summary(streak_days):
+    streak_days = max(0, int(streak_days))
+    return {
+        "streak_days": streak_days,
+        "streak_emoji": _streak_stage_emoji(streak_days),
+        "peers_total": 18 + streak_days,
+        "peers_this_week": 6 + min(streak_days, 12),
+        "favorite_hour": {"label": "9 AM", "count": 3},
+        "favorite_space": {"label": "Bobst 3F", "count": 4},
+    }
+
+
 def _require_signin():
     if _signed_in_user():
         return None
@@ -541,6 +694,17 @@ def debug_home_cooldown():
         has_checked_in_today=True,
         cooldown_active=True,
         cooldown_minutes=30,
+    )
+
+
+@app.route("/debug/profile/streak/<int:days>")
+def debug_profile_streak(days):
+    return render_template(
+        "profile.html",
+        user_id="debug@nyu.edu",
+        user_name="Debug",
+        oauth_ready=True,
+        profile_summary=_debug_profile_summary(days),
     )
 
 
@@ -922,39 +1086,42 @@ def profile():
             user_id=None,
             user_name=None,
             oauth_ready=_oauth_is_configured(),
-            checkins=[],
-            recommendations=[],
-            session_streak=0,
-            optional_feedback={},
+            profile_summary={
+                "streak_days": 0,
+                "streak_emoji": _streak_stage_emoji(0),
+                "peers_total": 0,
+                "peers_this_week": 0,
+                "favorite_hour": None,
+                "favorite_space": None,
+            },
         )
     checkins, checkins_error = _recent_user_checkins(user_id)
     rooms, rooms_error = _room_options()
-    recommendations, recs_error = _recommendations(top=3)
     profile_data, profile_error = _user_profile(user_id)
+    date_keys = [
+        date_key
+        for date_key in (_checkin_date_key(checkin.get("time")) for checkin in checkins)
+        if date_key
+    ]
+    active_user_counts, active_user_counts_error = _active_user_counts_by_date(date_keys)
 
     if checkins_error:
         flash("Unable to load personal history right now.")
     if rooms_error:
         flash("Unable to load room names right now.")
-    if recs_error:
-        flash("Unable to load recommendations right now.")
+    if active_user_counts_error:
+        flash("Unable to load peer totals right now.")
     if profile_data and _clean_emoji(profile_data.get("emoji")):
         session["user_emoji"] = profile_data["emoji"].strip()
     elif profile_error:
         session.setdefault("user_emoji", DEFAULT_USER_EMOJI)
-
-    # TODO: Replace session-only streak with a persistent backend user streak.
-    session_streak = int(session.get("session_streak", 0))
 
     return render_template(
         "profile.html",
         user_id=user_id,
         user_name=_signed_in_name(),
         oauth_ready=_oauth_is_configured(),
-        checkins=_decorate_checkins(checkins, rooms),
-        recommendations=recommendations,
-        session_streak=session_streak,
-        optional_feedback=session.get("optional_feedback", {}),
+        profile_summary=_profile_summary(checkins, rooms, active_user_counts),
     )
 
 
