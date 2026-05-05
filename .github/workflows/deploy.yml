@@ -14,6 +14,7 @@ jobs:
       RECOMMENDATION_PORT: ${{ vars.RECOMMENDATION_PORT }}
       MONGO_DATA_DIR: ${{ vars.MONGO_DATA_DIR }}
       WEBAPP_PORT: ${{ vars.WEBAPP_PORT }}
+      MONGODB_PORT: ${{ vars.MONGODB_PORT }}
     steps:
       - uses: actions/checkout@v4
 
@@ -50,7 +51,8 @@ jobs:
             export CHECKIN_PORT='${{ vars.CHECKIN_PORT }}' && \
             export RECOMMENDATION_PORT='${{ vars.RECOMMENDATION_PORT }}' && \
             export MONGO_DATA_DIR='${{ vars.MONGO_DATA_DIR }}' && \
-            export WEBAPP_PORT='${{ vars.WEBAPP_PORT }}'
+            export WEBAPP_PORT='${{ vars.WEBAPP_PORT }}' && \
+            export MONGODB_PORT='${{ vars.MONGODB_PORT }}' && \
             mkdir -p ${{ vars.DEPLOY_PATH }} && \
             cd ${{ vars.DEPLOY_PATH }} && \
             mkdir -p \"\${MONGO_DATA_DIR:-./mongodb}\" && \
