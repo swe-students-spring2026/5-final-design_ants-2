@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="flow-shell">
+    <div class="flow-copy">
+      <a class="flow-back" href="{{ url_for('home') }}">Back</a>
+      <div class="step-meta">
+        <span class="step-chip">01</span>
+        <p class="eyebrow">Step 1 of 3</p>
+      </div>
+      <h1 class="step-title">Where are you?</h1>
+
+    {% if repeat_message %}
+      <div class="repeat-confirm" role="alert">
+        <p>{{ repeat_message }}</p>
+        <div class="step-actions">
+          <form method="post" action="{{ url_for('checkin_step1') }}">
+            <input type="hidden" name="room_id" value="{{ repeat_room_id }}">
+            <input type="hidden" name="confirm_repeat" value="1">
+            <button class="button--success button--full" type="submit">Yes</button>
+          </form>
+          <a class="button button--paper button--full" href="{{ url_for('checkin_step1') }}">Back</a>
+        </div>
+      </div>
+    {% elif rooms %}
+      <div class="choice-grid">
+        {% for room in rooms %}
+          <form method="post" action="{{ url_for('checkin_step1') }}">
+            <input type="hidden" name="room_id" value="{{ room._id }}">
+            <button class="choice-button" type="submit">
+              <span>
+                <strong>{{ room.name if room.name else "Study room" }}</strong>
+              </span>
+            </button>
+          </form>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="empty-state">Room list unavailable.</p>
+      <div class="step-actions">
+        <a class="button button--black button--full" href="{{ url_for('home') }}">Rooms</a>
+      </div>
+    {% endif %}
+    </div>
+
+    <div class="flow-geometry" aria-hidden="true">
+      <div class="geo-cell geo-blue"><span class="geo-square"></span></div>
+      <div class="geo-cell geo-yellow"><span class="geo-circle"></span></div>
+      <div class="geo-cell geo-red"><span class="geo-circle is-black"></span></div>
+      <div class="geo-cell geo-paper"><span class="geo-square"></span></div>
+    </div>
+  </section>
+{% endblock %}

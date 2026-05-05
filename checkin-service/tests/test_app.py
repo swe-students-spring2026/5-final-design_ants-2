@@ -1,0 +1,264 @@
+import pytest
+from datetime import datetime, timedelta
+from app import create_app
+from db.db import checkins as checkins_collection, rooms as rooms_collection, users as users_collection
+
+
+@pytest.fixture
+def client():
+    checkins_collection.delete_many({})
+    rooms_collection.delete_many({})
+    users_collection.delete_many({})
+
+    app = create_app()
+    app.config["TESTING"] = True
+
+    with app.test_client() as client:
+        yield client
+
+    checkins_collection.delete_many({})
+    rooms_collection.delete_many({})
+    users_collection.delete_many({})
+
+
+def test_health(client):
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json["status"] == "ok"
+
+
+def test_get_rooms(client):
+    response = client.get("/api/rooms")
+    assert response.status_code == 200
+    assert isinstance(response.json, list)
+    assert len(response.json) > 0
+    assert "_id" in response.json[0]
+    assert "name" in response.json[0]
+
+
+def test_upsert_user_defaults_to_emoji(client):
+    payload = {
+        "user_id": "person@nyu.edu",
+        "username": "Person",
+        "email": "person@nyu.edu",
+    }
+
+    response = client.post("/api/users", json=payload)
+
+    assert response.status_code == 201
+    data = response.get_json()
+    assert data["user"]["_id"] == "person@nyu.edu"
+    assert data["user"]["emoji"]
+
+
+def test_update_user_emoji(client):
+    response = client.put(
+        "/api/users/person@nyu.edu/emoji",
+        json={"emoji": "\U0001F4BF"},
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["user"]["emoji"] == "\U0001F4BF"
+
+
+def test_create_checkin_success(client):
+    payload = {
+        "user_id": "zelu",
+        "room_id": "bobst_3",
+        "crowdedness": 4,
+        "quietness": 2
+    }
+
+    response = client.post("/api/checkins", json=payload)
+    assert response.status_code == 201
+
+    data = response.get_json()
+    assert data["message"] == "Check-in created successfully"
+    assert data["checkin"]["user_id"] == "zelu"
+    assert data["checkin"]["room_id"] == "bobst_3"
+    assert data["checkin"]["crowdedness"] == 4
+    assert data["checkin"]["quietness"] == 2
+    assert "time" in data["checkin"]
+
+
+def test_create_checkin_cooldown_blocks_repeat(client):
+    payload = {
+        "user_id": "zelu",
+        "room_id": "bobst_3",
+        "crowdedness": 4,
+        "quietness": 2
+    }
+
+    first_response = client.post("/api/checkins", json=payload)
+    second_response = client.post("/api/checkins", json={**payload, "room_id": "bobst_4"})
+
+    assert first_response.status_code == 201
+    assert second_response.status_code == 429
+    data = second_response.get_json()
+    assert data["error"] == "Punch cooldown active"
+    assert data["retry_after_seconds"] > 0
+
+
+def test_create_checkin_debug_bypass_skips_cooldown(client):
+    payload = {
+        "user_id": "zelu",
+        "room_id": "bobst_3",
+        "crowdedness": 4,
+        "quietness": 2
+    }
+
+    first_response = client.post("/api/checkins", json=payload)
+    second_response = client.post(
+        "/api/checkins",
+        json={**payload, "room_id": "bobst_4", "debug_bypass_cooldown": True},
+    )
+
+    assert first_response.status_code == 201
+    assert second_response.status_code == 201
+    assert second_response.get_json()["checkin"]["room_id"] == "bobst_4"
+
+
+def test_create_checkin_missing_field(client):
+    payload = {
+        "user_id": "zelu",
+        "room_id": "bobst_3",
+        "crowdedness": 4
+    }
+
+    response = client.post("/api/checkins", json=payload)
+    assert response.status_code == 400
+    assert "Missing field" in response.get_json()["error"]
+
+
+def test_create_checkin_invalid_room(client):
+    payload = {
+        "user_id": "zelu",
+        "room_id": "invalid_room",
+        "crowdedness": 4,
+        "quietness": 2
+    }
+
+    response = client.post("/api/checkins", json=payload)
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "Invalid room_id"
+
+
+def test_create_checkin_invalid_crowdedness(client):
+    payload = {
+        "user_id": "zelu",
+        "room_id": "bobst_3",
+        "crowdedness": 10,
+        "quietness": 2
+    }
+
+    response = client.post("/api/checkins", json=payload)
+    assert response.status_code == 400
+    assert "crowdedness must be an integer between 1 and 5" in response.get_json()["error"]
+
+
+def test_create_checkin_invalid_quietness(client):
+    payload = {
+        "user_id": "zelu",
+        "room_id": "bobst_3",
+        "crowdedness": 4,
+        "quietness": 10
+    }
+
+    response = client.post("/api/checkins", json=payload)
+    assert response.status_code == 400
+    assert "quietness must be an integer between 1 and 5" in response.get_json()["error"]
+
+
+def test_get_user_checkins(client):
+    payload1 = {
+        "user_id": "zelu",
+        "room_id": "bobst_2",
+        "crowdedness": 3,
+        "quietness": 4
+    }
+
+    payload2 = {
+        "user_id": "zelu",
+        "room_id": "bobst_4",
+        "crowdedness": 2,
+        "quietness": 5
+    }
+
+    client.post("/api/checkins", json=payload1)
+    checkins_collection.update_one(
+        {"user_id": "zelu", "room_id": "bobst_2"},
+        {"$set": {"time": (datetime.utcnow() - timedelta(minutes=31)).isoformat()}},
+    )
+    client.post("/api/checkins", json=payload2)
+
+    response = client.get("/api/checkins/zelu")
+    assert response.status_code == 200
+
+    data = response.get_json()
+    assert isinstance(data, list)
+    assert len(data) == 2
+    assert data[0]["user_id"] == "zelu"
+
+
+def test_get_active_user_counts_by_date(client):
+    checkins_collection.insert_many(
+        [
+            {
+                "user_id": "person@nyu.edu",
+                "room_id": "bobst_2",
+                "crowdedness": 3,
+                "quietness": 4,
+                "time": "2026-05-02T09:00:00",
+            },
+            {
+                "user_id": "friend@nyu.edu",
+                "room_id": "bobst_4",
+                "crowdedness": 2,
+                "quietness": 5,
+                "time": "2026-05-02T11:30:00",
+            },
+            {
+                "user_id": "person@nyu.edu",
+                "room_id": "bobst_ll1",
+                "crowdedness": 4,
+                "quietness": 2,
+                "time": "2026-05-02T14:15:00",
+            },
+            {
+                "user_id": "person@nyu.edu",
+                "room_id": "bobst_3",
+                "crowdedness": 1,
+                "quietness": 5,
+                "time": "2026-05-03T10:00:00",
+            },
+        ]
+    )
+
+    response = client.get("/api/checkins/active-users?dates=2026-05-02,2026-05-03,2026-05-04")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "dates": {
+            "2026-05-02": 2,
+            "2026-05-03": 1,
+            "2026-05-04": 0,
+        }
+    }
+
+
+def test_room_status_updated_after_checkin(client):
+    payload = {
+        "user_id": "zelu",
+        "room_id": "bobst_ll1",
+        "crowdedness": 5,
+        "quietness": 1
+    }
+
+    response = client.post("/api/checkins", json=payload)
+    assert response.status_code == 201
+
+    room = rooms_collection.find_one({"_id": "bobst_ll1"})
+    assert room["current_crowd"] == 5
+    assert room["current_quiet"] == 1
+    assert room["last_updated"] is not None

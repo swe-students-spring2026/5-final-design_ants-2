@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block content %}
+  {% if not user_id %}
+    <section class="auth-shell">
+      <div class="auth-copy">
+        <p class="eyebrow">Session</p>
+        <h1 class="display">Sign in to punch in.</h1>
+        <p class="subline">Use your NYU Google account to log room check-ins and keep your streak.</p>
+        <div class="hero-actions">
+          <a class="button button--primary button--full" href="{{ url_for('session_login') }}">Google sign in</a>
+        </div>
+        {% if not oauth_ready %}
+          <p class="profile-context">Google OAuth environment variables are not configured.</p>
+        {% endif %}
+      </div>
+
+      <div class="auth-geometry" aria-hidden="true">
+        <div class="geo-cell geo-blue"><span class="geo-circle is-black"></span></div>
+        <div class="geo-cell geo-yellow"><span class="geo-square"></span></div>
+        <div class="geo-cell geo-paper"><span class="geo-circle"></span></div>
+        <div class="geo-cell geo-green"><span class="geo-square"></span></div>
+      </div>
+    </section>
+  {% else %}
+    <div class="page-grid page-grid--profile">
+      <section class="profile-hero-card" aria-labelledby="profile-streak-title">
+        <div>
+          <h1 class="profile-streak-value" id="profile-streak-title">{{ profile_summary.streak_days }}</h1>
+          <p class="profile-streak-copy">day streak!</p>
+        </div>
+        <div class="profile-stage" aria-label="Streak milestone">{{ profile_summary.streak_emoji }}</div>
+      </section>
+
+      <section class="profile-card-grid" aria-label="Streak details">
+        <article class="profile-stat-card profile-stat-card--paper">
+          <p class="profile-stat-label">You've helped</p>
+          <p class="profile-stat-number">{{ profile_summary.peers_total }}</p>
+          <p class="profile-stat-copy">Peers so far</p>
+        </article>
+
+        <article class="profile-stat-card profile-stat-card--paper">
+          <p class="profile-stat-label">You've helped</p>
+          <p class="profile-stat-number">{{ profile_summary.peers_this_week }}</p>
+          <p class="profile-stat-copy">Peers this week</p>
+        </article>
+
+        <article class="profile-stat-card profile-stat-card--yellow">
+          <p class="profile-stat-label">Favorite Hour</p>
+          {% if profile_summary.favorite_hour %}
+            <p class="profile-stat-number">{{ profile_summary.favorite_hour.label }}</p>
+          {% else %}
+            <p class="profile-empty-copy">No punches yet</p>
+          {% endif %}
+        </article>
+
+        <article class="profile-stat-card profile-stat-card--ink">
+          <p class="profile-stat-label">Favorite Space</p>
+          {% if profile_summary.favorite_space %}
+            <p class="profile-stat-number">{{ profile_summary.favorite_space.label }}</p>
+          {% else %}
+            <p class="profile-empty-copy profile-empty-copy--inverse">No punches yet</p>
+          {% endif %}
+        </article>
+      </section>
+    </div>
+  {% endif %}
+{% endblock %}

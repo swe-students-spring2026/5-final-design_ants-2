@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="home-hero">
+    <div class="hero-copy">
+      <p class="eyebrow">Lockin</p>
+      <h1 class="display">Punch In.</h1>
+      <div class="hero-actions">
+        <a class="button button--primary button--full" href="{{ url_for('checkin') }}">Punch in</a>
+        <a class="button button--paper button--full" href="{{ url_for('home') }}">Rooms</a>
+      </div>
+    </div>
+
+    <div class="home-geometry" aria-hidden="true">
+      <div class="geo-cell geo-yellow"><span class="geo-circle"></span></div>
+      <div class="geo-cell geo-blue"><span class="geo-square"></span></div>
+      <div class="geo-cell geo-red"><span class="geo-circle is-black"></span></div>
+      <div class="geo-cell geo-paper"><span class="geo-square"></span></div>
+    </div>
+  </section>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="flow-shell flow-shell--single">
+    <div class="flow-copy">
+      <a class="flow-back" href="{{ url_for('home') }}">Back</a>
+      <div class="step-meta">
+        <span class="step-chip">+</span>
+        <p class="eyebrow">Extra credit</p>
+      </div>
+      <h1 class="step-title">Would you mind answering two more?</h1>
+      <p class="step-copy">It helps people pick a better room right now.</p>
+
+      <form class="choice-grid" method="post" action="{{ url_for('checkin_extra_prompt') }}">
+        <button class="choice-button button--success" type="submit" name="answer_more" value="1">
+          <span>
+            <strong>Sure</strong>
+            <small>Two quick taps</small>
+          </span>
+        </button>
+        <button class="choice-button button--paper" type="submit" name="answer_more" value="0">
+          <span>
+            <strong>Done</strong>
+            <small>Punch Straight in</small>
+          </span>
+        </button>
+      </form>
+    </div>
+  </section>
+{% endblock %}

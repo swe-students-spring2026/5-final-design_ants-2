@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <form class="emoji-picker" method="post" action="{{ url_for('profile_emoji') }}">
+    <div class="emoji-picker__bar">
+      <a href="{{ url_for('profile') }}">Cancel</a>
+      <button class="emoji-picker__done" type="submit">Done</button>
+    </div>
+
+    <section class="emoji-picker__preview" aria-labelledby="emoji-title">
+      <div class="emoji-picker__current" aria-hidden="true">{{ current_emoji }}</div>
+      <h1 id="emoji-title">{{ user_name if user_name else "You" }}</h1>
+      <p>Choose the sticker people see next to your check-ins.</p>
+      <input class="emoji-picker__input" type="hidden" name="emoji" value="{{ current_emoji }}">
+    </section>
+
+    <section class="emoji-picker__sheet" aria-label="Emoji choices">
+      <emoji-picker class="emoji-picker__element"></emoji-picker>
+    </section>
+  </form>
+
+  <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
+  <script>
+    const picker = document.querySelector('.emoji-picker__element');
+    const preview = document.querySelector('.emoji-picker__current');
+    const input = document.querySelector('.emoji-picker__input');
+
+    picker?.addEventListener('emoji-click', (event) => {
+      const emoji = event.detail?.unicode;
+      if (!emoji) return;
+      preview.textContent = emoji;
+      input.value = emoji;
+    });
+  </script>
+{% endblock %}
