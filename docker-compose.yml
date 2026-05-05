@@ -47,11 +47,14 @@ services:
 
   webapp:
     build:
-      context: ./webapp
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: webapp/Dockerfile
     image: incrediblez7/5-final-design_ants-webapp:${TAG:-latest}
+    env_file: ./checkin-service/.env
     ports:
       - "3000:5000"
+    environment:
+      - GOOGLE_REDIRECT_URI=http://localhost:3000/session/oauth/callback
     depends_on:
       checkin-service:
         condition: service_started

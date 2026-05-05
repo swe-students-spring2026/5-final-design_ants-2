@@ -18,12 +18,12 @@
         <div class="session-panel">
           {% if user_id %}
             <span class="session-label">User</span>
-            <strong>{{ user_id }}</strong>
+            <strong>{{ user_name if user_name else user_id }}</strong>
             <form method="post" action="{{ url_for('session_logout') }}">
               <button class="button button--small button--paper" type="submit">Out</button>
             </form>
           {% else %}
-            <a class="button button--small button--paper" href="{{ url_for('profile') }}">Sign In</a>
+            <a class="button button--small button--paper" href="{{ url_for('session_login') }}">Sign In</a>
           {% endif %}
         </div>
       </div>

@@ -1,5 +1,6 @@
 import pytest
 import requests_mock
+import app as webapp_module
 from app import app
 
 @pytest.fixture
@@ -14,6 +15,8 @@ def test_index_success(client):
         m.get('http://recommendation-service:8000/api/recommend?top=5', json={'recommendations': []})
         response = client.get('/')
         assert response.status_code == 200
+        assert b'u1' not in response.data
+        assert b'Google' in response.data
 
 def test_index_api_error(client):
     with requests_mock.Mocker() as m:
@@ -43,3 +46,68 @@ def test_checkin_exception(client):
         response = client.post('/checkin', data={'room_id': 'r1'})
         assert response.status_code == 200
         assert b'Error' in response.data
+
+
+def test_oauth_login_redirects_to_google(client, monkeypatch):
+    monkeypatch.setenv('GOOGLE_CLIENT_ID', 'client-id')
+    monkeypatch.setenv('GOOGLE_CLIENT_SECRET', 'client-secret')
+    monkeypatch.setenv('GOOGLE_REDIRECT_URI', 'http://localhost:3000/session/oauth/callback')
+
+    response = client.get('/session/login', base_url='http://localhost:3000')
+
+    assert response.status_code == 302
+    assert response.location.startswith(webapp_module.AUTH_URL)
+    assert 'client_id=client-id' in response.location
+    with client.session_transaction() as sess:
+        assert sess['oauth_states']
+
+
+def test_oauth_callback_sets_session(client, monkeypatch):
+    monkeypatch.setenv('GOOGLE_CLIENT_ID', 'client-id')
+    monkeypatch.setenv('GOOGLE_CLIENT_SECRET', 'client-secret')
+    monkeypatch.setenv('GOOGLE_REDIRECT_URI', 'http://localhost:3000/session/oauth/callback')
+
+    with client.session_transaction() as sess:
+        sess['oauth_states'] = ['state-123']
+
+    with requests_mock.Mocker() as m:
+        m.post(webapp_module.TOKEN_URL, json={'access_token': 'token'})
+        m.get(webapp_module.USERINFO_URL, json={'email': 'person@nyu.edu', 'name': 'Person'})
+        response = client.get('/session/oauth/callback?code=abc&state=state-123')
+
+    assert response.status_code == 302
+    assert response.location == '/'
+    with client.session_transaction() as sess:
+        assert sess['user_id'] == 'person@nyu.edu'
+        assert sess['user_email'] == 'person@nyu.edu'
+        assert sess['user_name'] == 'Person'
+
+
+def test_oauth_callback_rejects_non_nyu_email(client, monkeypatch):
+    monkeypatch.setenv('GOOGLE_CLIENT_ID', 'client-id')
+    monkeypatch.setenv('GOOGLE_CLIENT_SECRET', 'client-secret')
+    monkeypatch.setenv('GOOGLE_REDIRECT_URI', 'http://localhost:3000/session/oauth/callback')
+
+    with client.session_transaction() as sess:
+        sess['oauth_states'] = ['state-123']
+
+    with requests_mock.Mocker() as m:
+        m.post(webapp_module.TOKEN_URL, json={'access_token': 'token'})
+        m.get(webapp_module.USERINFO_URL, json={'email': 'person@example.com', 'name': 'Person'})
+        response = client.get('/session/oauth/callback?code=abc&state=state-123')
+
+    assert response.status_code == 302
+    assert response.location == '/profile'
+    with client.session_transaction() as sess:
+        assert 'user_id' not in sess
+
+
+def test_oauth_login_normalizes_to_callback_host(client, monkeypatch):
+    monkeypatch.setenv('GOOGLE_CLIENT_ID', 'client-id')
+    monkeypatch.setenv('GOOGLE_CLIENT_SECRET', 'client-secret')
+    monkeypatch.setenv('GOOGLE_REDIRECT_URI', 'http://localhost:3000/session/oauth/callback')
+
+    response = client.get('/session/login', base_url='http://127.0.0.1:3000')
+
+    assert response.status_code == 302
+    assert response.location == 'http://localhost:3000/session/login'

@@ -7,10 +7,119 @@ from flask import Flask, flash, redirect, render_template, request as flask_requ
 
 CHECKIN_SERVICE_URL = os.getenv("CHECKIN_API", os.getenv("CHECKIN_SERVICE_URL", "http://checkin-service:5000"))
 RECOMMENDATION_SERVICE_URL = os.getenv("RECOMMENDATION_API", os.getenv("RECOMMENDATION_SERVICE_URL", "http://recommendation-service:8000"))
+AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+TOKEN_URL = "https://oauth2.googleapis.com/token"
+USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
+SCOPES = "openid email profile"
+DEFAULT_REDIRECT_URI = "http://localhost:3000/session/oauth/callback"
+OAUTH_STATE_LIMIT = 8
 
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "wireframe-dev-secret")
+
+
+class OAuthConfigError(RuntimeError):
+    pass
+
+
+def _oauth_is_configured():
+    return bool(os.getenv("GOOGLE_CLIENT_ID") and os.getenv("GOOGLE_CLIENT_SECRET"))
+
+
+def _required_env(name):
+    value = os.getenv(name)
+    if not value:
+        raise OAuthConfigError(f"{name} is not configured.")
+    return value
+
+
+def _oauth_redirect_uri():
+    return os.getenv("GOOGLE_REDIRECT_URI", DEFAULT_REDIRECT_URI)
+
+
+def _oauth_callback_base_url():
+    parsed_uri = parse.urlparse(_oauth_redirect_uri())
+    if parsed_uri.scheme and parsed_uri.netloc:
+        return f"{parsed_uri.scheme}://{parsed_uri.netloc}"
+    return None
+
+
+def _oauth_generate_login_url(csrf_state):
+    params = {
+        "client_id": _required_env("GOOGLE_CLIENT_ID"),
+        "redirect_uri": _oauth_redirect_uri(),
+        "response_type": "code",
+        "scope": SCOPES,
+        "state": csrf_state,
+        "access_type": "offline",
+        "prompt": "consent",
+    }
+    return f"{AUTH_URL}?{parse.urlencode(params)}"
+
+
+def _oauth_callback(args):
+    code = args.get("code")
+    if not code:
+        return False, "Google did not return a token code."
+
+    try:
+        token_response = requests.post(
+            TOKEN_URL,
+            data={
+                "code": code,
+                "client_id": _required_env("GOOGLE_CLIENT_ID"),
+                "client_secret": _required_env("GOOGLE_CLIENT_SECRET"),
+                "redirect_uri": _oauth_redirect_uri(),
+                "grant_type": "authorization_code",
+            },
+            timeout=8,
+        )
+        token_response.raise_for_status()
+        access_token = token_response.json()["access_token"]
+
+        user_response = requests.get(
+            USERINFO_URL,
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=8,
+        )
+        user_response.raise_for_status()
+        return True, user_response.json()
+    except (KeyError, requests.RequestException, OAuthConfigError) as exc:
+        return False, str(exc)
+
+
+def _remember_oauth_state(csrf_state):
+    states = session.get("oauth_states", [])
+    if isinstance(states, str):
+        states = [states]
+    states.append(csrf_state)
+    session["oauth_states"] = states[-OAUTH_STATE_LIMIT:]
+
+
+def _consume_oauth_state(returned_state):
+    states = session.get("oauth_states", [])
+    if isinstance(states, str):
+        states = [states]
+
+    legacy_state = session.pop("oauth_state", None)
+    if legacy_state:
+        states.append(legacy_state)
+
+    if returned_state not in states:
+        session["oauth_states"] = states[-OAUTH_STATE_LIMIT:]
+        return False
+
+    states.remove(returned_state)
+    session["oauth_states"] = states[-OAUTH_STATE_LIMIT:]
+    return True
+
+
+def _is_nyu_email(email):
+    if not email or "@" not in email:
+        return False
+    domain = email.rsplit("@", 1)[1].lower()
+    return domain == "nyu.edu" or domain.endswith(".nyu.edu")
 
 
 def _safe_json_get(url):
@@ -86,6 +195,10 @@ def _signed_in_user():
     return session.get("user_id")
 
 
+def _signed_in_name():
+    return session.get("user_name")
+
+
 def _room_options():
     ok, data, err = _safe_json_get(f"{CHECKIN_SERVICE_URL}/api/rooms")
     if not ok:
@@ -94,7 +207,8 @@ def _room_options():
 
 
 def _recent_user_checkins(user_id):
-    ok, data, err = _safe_json_get(f"{CHECKIN_SERVICE_URL}/api/checkins/{user_id}")
+    encoded_user_id = parse.quote(str(user_id), safe="")
+    ok, data, err = _safe_json_get(f"{CHECKIN_SERVICE_URL}/api/checkins/{encoded_user_id}")
     if not ok:
         return [], err
     return data or [], None
@@ -130,23 +244,62 @@ def home():
     return render_template(
         "home.html",
         user_id=user_id,
-        sample_user_ids=["u1", "u2", "u3", "u4"],
+        user_name=_signed_in_name(),
+        oauth_ready=_oauth_is_configured(),
         rooms=rooms,
         recommendations=recommendations,
         current_year=datetime.utcnow().year,
     )
 
 
-@app.route("/session/login", methods=["POST"])
+@app.route("/session/login", methods=["GET", "POST"])
 def session_login():
-    user_id = flask_request.form.get("user_id", "").strip()
-    if not user_id:
-        flash("Select a user before signing in.")
+    if flask_request.method == "POST":
+        flash("Use Google sign-in.")
         return redirect(url_for("home"))
 
+    callback_base_url = _oauth_callback_base_url()
+    current_base_url = flask_request.host_url.rstrip("/")
+    if callback_base_url and callback_base_url != current_base_url:
+        return redirect(f"{callback_base_url}{url_for('session_login')}")
+
+    csrf_state = os.urandom(16).hex()
+    _remember_oauth_state(csrf_state)
+    try:
+        return redirect(_oauth_generate_login_url(csrf_state))
+    except OAuthConfigError as exc:
+        session.pop("oauth_states", None)
+        flash(str(exc))
+        return redirect(url_for("profile"))
+
+
+@app.route("/session/oauth/callback")
+def session_oauth_callback():
+    returned_state = flask_request.args.get("state")
+    if not _consume_oauth_state(returned_state):
+        flash("Sign-in failed: Wrong OAuth state returned. Start sign-in again from the same Lockin tab.")
+        return redirect(url_for("profile"))
+
+    ok, result = _oauth_callback(flask_request.args)
+    if not ok:
+        flash(f"Sign-in failed: {result}")
+        return redirect(url_for("profile"))
+
+    email = (result.get("email") or "").strip()
+    if not _is_nyu_email(email):
+        flash("Sign-in failed: use an NYU email.")
+        return redirect(url_for("profile"))
+
+    user_id = email or result.get("id") or result.get("sub")
+    if not user_id:
+        flash("Sign-in failed: Google did not return an account id.")
+        return redirect(url_for("profile"))
+
     session["user_id"] = user_id
+    session["user_email"] = email
+    session["user_name"] = result.get("name") or email or user_id
     session.setdefault("session_streak", 0)
-    flash(f"Signed in as {user_id}.")
+    flash("Signed in.")
     return redirect(url_for("home"))
 
 
@@ -365,7 +518,8 @@ def profile():
         return render_template(
             "profile.html",
             user_id=None,
-            sample_user_ids=["u1", "u2", "u3", "u4"],
+            user_name=None,
+            oauth_ready=_oauth_is_configured(),
             checkins=[],
             recommendations=[],
             session_streak=0,
@@ -385,6 +539,8 @@ def profile():
     return render_template(
         "profile.html",
         user_id=user_id,
+        user_name=_signed_in_name(),
+        oauth_ready=_oauth_is_configured(),
         checkins=checkins,
         recommendations=recommendations,
         session_streak=session_streak,

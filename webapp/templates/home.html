@@ -7,20 +7,18 @@
         <p class="eyebrow">Lockin / Today</p>
         <h1 class="display">Punch In.</h1>
         {% if user_id %}
-          <p class="subline">Signed in as {{ user_id }}.</p>
+          <p class="subline">Signed in as {{ user_name if user_name else user_id }}.</p>
           <div class="hero-actions">
             <a class="button button--red button--full" href="{{ url_for('checkin') }}">Start</a>
             <a class="button button--blue button--full" href="{{ url_for('profile') }}">Streak</a>
           </div>
         {% else %}
-          <p class="subline">Sign in once. Punch in fast.</p>
-          <div class="sign-in-grid" aria-label="Demo users">
-            {% for uid in sample_user_ids %}
-              <form method="post" action="{{ url_for('session_login') }}">
-                <input type="hidden" name="user_id" value="{{ uid }}">
-                <button class="button--blue button--full" type="submit">{{ uid }}</button>
-              </form>
-            {% endfor %}
+          <p class="subline">Sign in with Google. Punch in fast.</p>
+          <div class="hero-actions">
+            <a class="button button--blue button--full" href="{{ url_for('session_login') }}">Google</a>
+            {% if not oauth_ready %}
+              <a class="button button--yellow button--full" href="{{ url_for('profile') }}">Setup</a>
+            {% endif %}
           </div>
         {% endif %}
       </div>
